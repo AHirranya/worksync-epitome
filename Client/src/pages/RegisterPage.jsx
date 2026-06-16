@@ -1,0 +1,455 @@
+// Client/src/pages/RegisterPage.jsx
+
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import api from "../api/api";
+
+function RegisterPage() {
+  const navigate = useNavigate();
+
+  const [formData, setFormData] = useState({
+    fullName: "",
+    email: "",
+    password: "",
+  });
+
+  const [showPassword, setShowPassword] = useState(false);
+  const [message, setMessage] = useState("");
+  const [messageType, setMessageType] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const updateField = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value,
+    });
+  };
+
+  const togglePassword = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setShowPassword((prev) => !prev);
+  };
+
+  const handleRegister = async (e) => {
+    e.preventDefault();
+
+    setMessage("");
+    setMessageType("");
+    setLoading(true);
+
+    try {
+      const res = await api.post("/auth/register", {
+        fullName: formData.fullName,
+        email: formData.email,
+        password: formData.password,
+      });
+
+      setMessage(res.data.message || "Registration successful. Redirecting...");
+      setMessageType("success");
+
+      setTimeout(() => {
+        navigate("/login");
+      }, 700);
+    } catch (error) {
+      setMessage(
+        error.response?.data?.error ||
+          error.response?.data?.message ||
+          "Registration failed. Please try again."
+      );
+
+      setMessageType("error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <>
+      <style>
+        {`
+          .auth-pro-page {
+            min-height: calc(100vh - 90px);
+            background:
+              radial-gradient(circle at top left, rgba(255, 122, 0, 0.18), transparent 32%),
+              radial-gradient(circle at bottom right, rgba(255, 122, 0, 0.08), transparent 30%),
+              #050505;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 60px 6%;
+          }
+
+          .auth-pro-shell {
+            width: 100%;
+            max-width: 1120px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            background: rgba(12, 12, 12, 0.95);
+            border: 1px solid rgba(255, 122, 0, 0.22);
+            border-radius: 28px;
+            overflow: hidden;
+            box-shadow: 0 30px 90px rgba(0, 0, 0, 0.55);
+          }
+
+          .auth-pro-info {
+            padding: 56px;
+            background:
+              linear-gradient(135deg, rgba(255, 122, 0, 0.18), rgba(0, 0, 0, 0.4)),
+              #080808;
+            border-right: 1px solid rgba(255, 122, 0, 0.16);
+          }
+
+          .auth-pro-badge {
+            display: inline-flex;
+            background: rgba(255, 122, 0, 0.14);
+            color: #ff7a00;
+            border: 1px solid rgba(255, 122, 0, 0.35);
+            padding: 10px 16px;
+            border-radius: 999px;
+            font-size: 13px;
+            font-weight: 900;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            margin-bottom: 24px;
+          }
+
+          .auth-pro-info h1 {
+            color: #ffffff;
+            font-size: clamp(36px, 5vw, 58px);
+            line-height: 1;
+            margin-bottom: 18px;
+            letter-spacing: -0.04em;
+          }
+
+          .auth-pro-info p {
+            color: #c9c9c9;
+            font-size: 17px;
+            line-height: 1.7;
+            max-width: 430px;
+          }
+
+          .auth-pro-points {
+            display: grid;
+            gap: 16px;
+            margin-top: 34px;
+          }
+
+          .auth-pro-point {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            color: #eeeeee;
+            font-weight: 800;
+          }
+
+          .auth-pro-point span {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            background: #ff7a00;
+            color: #000000;
+            display: grid;
+            place-items: center;
+            font-weight: 1000;
+          }
+
+          .auth-pro-card {
+            padding: 56px;
+            background: #0b0b0b;
+          }
+
+          .auth-pro-card-header {
+            margin-bottom: 30px;
+          }
+
+          .auth-pro-card-header p {
+            color: #ff7a00;
+            font-size: 13px;
+            font-weight: 900;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+          }
+
+          .auth-pro-card-header h2 {
+            color: #ffffff;
+            font-size: 38px;
+            margin-bottom: 8px;
+            letter-spacing: -0.03em;
+          }
+
+          .auth-pro-card-header span {
+            color: #a9a9a9;
+            font-size: 15px;
+          }
+
+          .auth-pro-message {
+            padding: 14px 16px;
+            border-radius: 14px;
+            margin-bottom: 20px;
+            font-weight: 800;
+            border: 1px solid rgba(34, 197, 94, 0.35);
+            background: rgba(34, 197, 94, 0.1);
+            color: #22c55e;
+          }
+
+          .auth-pro-message.error {
+            border-color: rgba(255, 70, 70, 0.4);
+            background: rgba(255, 70, 70, 0.1);
+            color: #ff5c5c;
+          }
+
+          .auth-pro-form {
+            display: grid;
+            gap: 20px;
+          }
+
+          .auth-pro-form label {
+            color: #ffffff;
+            font-weight: 900;
+            display: grid;
+            gap: 10px;
+          }
+
+          .auth-pro-form input {
+            width: 100%;
+            height: 56px;
+            background: #151515;
+            color: #ffffff;
+            border: 1px solid #2d2d2d;
+            border-radius: 16px;
+            padding: 0 18px;
+            font-size: 16px;
+            outline: none;
+            transition: 0.2s ease;
+          }
+
+          .auth-pro-form input::placeholder {
+            color: #777777;
+          }
+
+          .auth-pro-form input:focus {
+            border-color: #ff7a00;
+            box-shadow: 0 0 0 4px rgba(255, 122, 0, 0.12);
+          }
+
+          .password-field {
+            position: relative;
+            width: 100%;
+          }
+
+          .password-field input {
+            padding-right: 72px;
+          }
+
+          .password-toggle {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 54px;
+            height: 40px;
+            border: none;
+            border-radius: 12px;
+            background: rgba(255, 122, 0, 0.16);
+            color: #ff7a00;
+            font-size: 13px;
+            font-weight: 1000;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 5;
+          }
+
+          .password-toggle:hover {
+            background: #ff7a00;
+            color: #000000;
+          }
+
+          .auth-pro-submit {
+            height: 58px;
+            border: none;
+            border-radius: 16px;
+            background: #ff7a00;
+            color: #000000;
+            font-size: 17px;
+            font-weight: 1000;
+            cursor: pointer;
+            transition: 0.2s ease;
+            margin-top: 4px;
+          }
+
+          .auth-pro-submit:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 18px 40px rgba(255, 122, 0, 0.25);
+          }
+
+          .auth-pro-submit:disabled {
+            opacity: 0.65;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+          }
+
+          .auth-pro-switch {
+            margin-top: 24px;
+            color: #bdbdbd;
+            text-align: center;
+          }
+
+          .auth-pro-switch a {
+            color: #ff7a00;
+            font-weight: 900;
+            text-decoration: none;
+          }
+
+          .auth-pro-switch a:hover {
+            text-decoration: underline;
+          }
+
+          @media (max-width: 900px) {
+            .auth-pro-shell {
+              grid-template-columns: 1fr;
+            }
+
+            .auth-pro-info {
+              border-right: none;
+              border-bottom: 1px solid rgba(255, 122, 0, 0.16);
+              padding: 38px;
+            }
+
+            .auth-pro-card {
+              padding: 38px;
+            }
+          }
+
+          @media (max-width: 520px) {
+            .auth-pro-page {
+              padding: 30px 16px;
+            }
+
+            .auth-pro-info,
+            .auth-pro-card {
+              padding: 28px;
+            }
+
+            .auth-pro-card-header h2 {
+              font-size: 32px;
+            }
+          }
+        `}
+      </style>
+
+      <main className="auth-pro-page">
+        <section className="auth-pro-shell">
+          <div className="auth-pro-info">
+            <div className="auth-pro-badge">WorkSync Portal</div>
+
+            <h1>Create your account.</h1>
+
+            <p>
+              Register as an applicant/user. Admin, HR, mentor, and intern roles
+              are assigned by authorized users.
+            </p>
+
+            <div className="auth-pro-points">
+              <div className="auth-pro-point">
+                <span>1</span>
+                Create applicant account
+              </div>
+
+              <div className="auth-pro-point">
+                <span>2</span>
+                Apply for internship programs
+              </div>
+
+              <div className="auth-pro-point">
+                <span>3</span>
+                Access intern dashboard after onboarding
+              </div>
+            </div>
+          </div>
+
+          <div className="auth-pro-card">
+            <div className="auth-pro-card-header">
+              <p>New Account</p>
+              <h2>Register</h2>
+              <span>Create your applicant/user account.</span>
+            </div>
+
+            {message && (
+              <div
+                className={`auth-pro-message ${
+                  messageType === "error" ? "error" : ""
+                }`}
+              >
+                {message}
+              </div>
+            )}
+
+            <form className="auth-pro-form" onSubmit={handleRegister}>
+              <label>
+                Full Name
+                <input
+                  type="text"
+                  name="fullName"
+                  value={formData.fullName}
+                  onChange={updateField}
+                  placeholder="Enter your full name"
+                  required
+                />
+              </label>
+
+              <label>
+                Email Address
+                <input
+                  type="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={updateField}
+                  placeholder="Enter your email"
+                  required
+                />
+              </label>
+
+              <label>
+                Password
+                <div className="password-field">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    name="password"
+                    value={formData.password}
+                    onChange={updateField}
+                    placeholder="Create a password"
+                    minLength="6"
+                    required
+                  />
+
+                  <button
+                    type="button"
+                    className="password-toggle"
+                    onClick={togglePassword}
+                  >
+                    {showPassword ? "Hide" : "Show"}
+                  </button>
+                </div>
+              </label>
+
+              <button className="auth-pro-submit" type="submit" disabled={loading}>
+                {loading ? "Creating Account..." : "Create Account"}
+              </button>
+            </form>
+
+            <p className="auth-pro-switch">
+              Already have an account? <Link to="/login">Login</Link>
+            </p>
+          </div>
+        </section>
+      </main>
+    </>
+  );
+}
+
+export default RegisterPage;
