@@ -1,12 +1,7 @@
 // Client/src/App.jsx
 
 import { useEffect, useState } from "react";
-import {
-  BrowserRouter,
-  Navigate,
-  Route,
-  Routes,
-} from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
 import api from "./api/api";
 
@@ -25,11 +20,24 @@ import NotFoundPage from "./pages/NotFoundPage";
 import UnauthorizedPage from "./pages/UnauthorizedPage";
 import SessionExpiredPage from "./pages/SessionExpiredPage";
 
-function App() {
-  const [user, setUser] = useState(() => {
-    return JSON.parse(localStorage.getItem("worksync_user") || "null");
-  });
+function safeParseUser() {
+  try {
+    const storedValue = localStorage.getItem("worksync_user");
 
+    if (!storedValue || storedValue === "undefined" || storedValue === "null") {
+      return null;
+    }
+
+    return JSON.parse(storedValue);
+  } catch (error) {
+    localStorage.removeItem("worksync_user");
+    localStorage.removeItem("worksync_token");
+    return null;
+  }
+}
+
+function App() {
+  const [user, setUser] = useState(() => safeParseUser());
   const [loading, setLoading] = useState(true);
 
   const getDashboardPath = (role) => {
@@ -46,7 +54,9 @@ function App() {
     try {
       const token = localStorage.getItem("worksync_token");
 
-      if (!token) {
+      if (!token || token === "undefined" || token === "null") {
+        localStorage.removeItem("worksync_user");
+        localStorage.removeItem("worksync_token");
         setUser(null);
         setLoading(false);
         return;
@@ -84,7 +94,6 @@ function App() {
     localStorage.removeItem("worksync_token");
 
     setUser(null);
-
     window.location.href = "/login";
   };
 

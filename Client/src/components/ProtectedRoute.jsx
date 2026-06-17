@@ -2,8 +2,24 @@
 
 import { Navigate } from "react-router-dom";
 
+function safeParseUser() {
+  try {
+    const storedValue = localStorage.getItem("worksync_user");
+
+    if (!storedValue || storedValue === "undefined" || storedValue === "null") {
+      return null;
+    }
+
+    return JSON.parse(storedValue);
+  } catch (error) {
+    localStorage.removeItem("worksync_user");
+    localStorage.removeItem("worksync_token");
+    return null;
+  }
+}
+
 function ProtectedRoute({ user, loading, allowedRoles, children }) {
-  const storedUser = JSON.parse(localStorage.getItem("worksync_user") || "null");
+  const storedUser = safeParseUser();
   const token = localStorage.getItem("worksync_token");
 
   const activeUser = user || storedUser;
@@ -22,7 +38,7 @@ function ProtectedRoute({ user, loading, allowedRoles, children }) {
     );
   }
 
-  if (!token || !activeUser) {
+  if (!token || token === "undefined" || token === "null" || !activeUser) {
     return <Navigate to="/session-expired" replace />;
   }
 

@@ -2,8 +2,24 @@
 
 import { Link } from "react-router-dom";
 
+function safeParseUser() {
+  try {
+    const storedValue = localStorage.getItem("worksync_user");
+
+    if (!storedValue || storedValue === "undefined" || storedValue === "null") {
+      return null;
+    }
+
+    return JSON.parse(storedValue);
+  } catch (error) {
+    localStorage.removeItem("worksync_user");
+    localStorage.removeItem("worksync_token");
+    return null;
+  }
+}
+
 function UnauthorizedPage() {
-  const storedUser = JSON.parse(localStorage.getItem("worksync_user") || "null");
+  const storedUser = safeParseUser();
 
   const getDashboardPath = () => {
     const role = String(storedUser?.role || "").toLowerCase();
