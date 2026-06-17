@@ -3683,3 +3683,33 @@ tbody tr:hover {
     gap: 10px;
   }
 }
+/* OVERTIME REASON RULE */
+
+.overtime-reason-field {
+  border-color: rgba(255, 122, 0, 0.55) !important;
+  background: rgba(255, 122, 0, 0.08) !important;
+}
+
+.overtime-text {
+  display: block;
+  color: #ff7a00;
+  font-weight: 900;
+  margin-top: 8px;
+}
+
+.overtime-box {
+  background: rgba(255, 122, 0, 0.08);
+  border: 1px solid rgba(255, 122, 0, 0.28);
+  border-radius: 14px;
+  padding: 14px;
+  margin: 14px 0;
+}
+
+.overtime-box strong {
+  color: #ff7a00;
+}
+
+.overtime-box p {
+  color: #ffffff;
+  margin-top: 6px;
+}

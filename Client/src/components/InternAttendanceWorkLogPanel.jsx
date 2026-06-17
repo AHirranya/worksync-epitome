@@ -12,6 +12,7 @@ function InternAttendanceWorkLogPanel() {
     summary: "",
     hoursWorked: "",
     blockers: "",
+    overtimeReason: "",
   });
 
   const [message, setMessage] = useState("");
@@ -21,6 +22,8 @@ function InternAttendanceWorkLogPanel() {
     setMessage(text);
     setMessageType(type);
   };
+
+  const workedMoreThanEightHours = Number(workLogForm.hoursWorked) > 8;
 
   const formatDateIST = (dateValue) => {
     if (!dateValue) return "-";
@@ -76,10 +79,7 @@ function InternAttendanceWorkLogPanel() {
       showMessage(res.data.message || "Check-in successful.");
       await loadAttendance();
     } catch (error) {
-      showMessage(
-        error.response?.data?.message || "Check-in failed.",
-        "error"
-      );
+      showMessage(error.response?.data?.message || "Check-in failed.", "error");
     }
   };
 
@@ -89,10 +89,7 @@ function InternAttendanceWorkLogPanel() {
       showMessage(res.data.message || "Check-out successful.");
       await loadAttendance();
     } catch (error) {
-      showMessage(
-        error.response?.data?.message || "Check-out failed.",
-        "error"
-      );
+      showMessage(error.response?.data?.message || "Check-out failed.", "error");
     }
   };
 
@@ -106,11 +103,36 @@ function InternAttendanceWorkLogPanel() {
   const submitWorkLog = async (e) => {
     e.preventDefault();
 
+    setMessage("");
+    setMessageType("");
+
+    if (!workLogForm.summary.trim()) {
+      showMessage("Work summary is required.", "error");
+      return;
+    }
+
+    if (!workLogForm.hoursWorked || Number(workLogForm.hoursWorked) <= 0) {
+      showMessage("Hours worked must be greater than 0.", "error");
+      return;
+    }
+
+    if (
+      Number(workLogForm.hoursWorked) > 8 &&
+      !workLogForm.overtimeReason.trim()
+    ) {
+      showMessage(
+        "You worked more than 8 hours. Please give an overtime reason before submitting.",
+        "error"
+      );
+      return;
+    }
+
     try {
       const res = await api.post("/work-logs", {
         summary: workLogForm.summary,
         hoursWorked: workLogForm.hoursWorked,
         blockers: workLogForm.blockers,
+        overtimeReason: workLogForm.overtimeReason,
       });
 
       showMessage(res.data.message || "Work log submitted successfully.");
@@ -119,6 +141,7 @@ function InternAttendanceWorkLogPanel() {
         summary: "",
         hoursWorked: "",
         blockers: "",
+        overtimeReason: "",
       });
 
       await loadWorkLogs();
@@ -140,8 +163,8 @@ function InternAttendanceWorkLogPanel() {
         <div>
           <h2>Attendance & Daily Work Log</h2>
           <p>
-            Mark your check-in/check-out and submit your daily internship work.
-            All times are shown in Indian Standard Time.
+            Standard internship work time is <strong>8 hours</strong>. If you
+            work more than 8 hours, overtime reason is compulsory.
           </p>
         </div>
       </div>
@@ -218,11 +241,22 @@ function InternAttendanceWorkLogPanel() {
             name="hoursWorked"
             value={workLogForm.hoursWorked}
             onChange={updateWorkLogField}
-            placeholder="Hours worked"
+            placeholder="Hours worked. Standard: 8 hours"
             min="0"
             step="0.5"
             required
           />
+
+          {workedMoreThanEightHours && (
+            <textarea
+              name="overtimeReason"
+              value={workLogForm.overtimeReason}
+              onChange={updateWorkLogField}
+              placeholder="You worked more than 8 hours. Give overtime reason."
+              required
+              className="overtime-reason-field"
+            ></textarea>
+          )}
 
           <textarea
             name="blockers"
@@ -246,7 +280,8 @@ function InternAttendanceWorkLogPanel() {
               <div className="mini-table-row" key={item.id}>
                 <span>{formatDateIST(item.attendance_date)}</span>
                 <strong>
-                  {formatTimeIST(item.check_in)} - {formatTimeIST(item.check_out)} IST
+                  {formatTimeIST(item.check_in)} -{" "}
+                  {formatTimeIST(item.check_out)} IST
                 </strong>
               </div>
             ))}
@@ -267,6 +302,12 @@ function InternAttendanceWorkLogPanel() {
                 </div>
 
                 <p>{log.summary}</p>
+
+                {Number(log.hours_worked) > 8 && log.overtime_reason && (
+                  <small className="overtime-text">
+                    Overtime Reason: {log.overtime_reason}
+                  </small>
+                )}
 
                 {log.blockers && <small>Blockers: {log.blockers}</small>}
 

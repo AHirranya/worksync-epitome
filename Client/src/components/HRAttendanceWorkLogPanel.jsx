@@ -84,8 +84,8 @@ function HRAttendanceWorkLogPanel() {
     <section className="panel">
       <h2>Attendance & Work Logs</h2>
       <p>
-        Track intern check-ins, check-outs, and daily work submissions. All
-        attendance times are shown in IST.
+        Standard internship work time is <strong>8 hours</strong>. If an intern
+        works more than 8 hours, overtime reason must be submitted.
       </p>
 
       {message && (
@@ -172,6 +172,13 @@ function HRAttendanceWorkLogPanel() {
             <p>
               <strong>Hours Worked:</strong> {log.hours_worked || 0}
             </p>
+
+            {Number(log.hours_worked) > 8 && (
+              <div className="overtime-box">
+                <strong>Overtime Reason:</strong>
+                <p>{log.overtime_reason || "No reason provided"}</p>
+              </div>
+            )}
 
             {log.blockers && (
               <p>
