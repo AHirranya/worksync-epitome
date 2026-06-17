@@ -45,7 +45,11 @@ function ProtectedRoute({ user, loading, allowedRoles, children }) {
 
   const userRole = String(activeUser.role || "").toLowerCase();
 
-  if (allowedRoles && !allowedRoles.includes(userRole)) {
+  const cleanAllowedRoles = Array.isArray(allowedRoles)
+    ? allowedRoles.map((role) => String(role).toLowerCase())
+    : [];
+
+  if (cleanAllowedRoles.length > 0 && !cleanAllowedRoles.includes(userRole)) {
     return <Navigate to="/unauthorized" replace />;
   }
 

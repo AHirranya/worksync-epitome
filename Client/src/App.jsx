@@ -15,6 +15,7 @@ import RegisterPage from "./pages/RegisterPage";
 import AdminDashboard from "./pages/AdminDashboard";
 import HRDashboard from "./pages/HRDashboard";
 import InternDashboard from "./pages/InternDashboard";
+import MentorDashboard from "./pages/MentorDashboard";
 
 import NotFoundPage from "./pages/NotFoundPage";
 import UnauthorizedPage from "./pages/UnauthorizedPage";
@@ -47,7 +48,8 @@ function App() {
     const cleanRole = String(role || "").toLowerCase();
 
     if (cleanRole === "admin") return "/admin-dashboard";
-    if (cleanRole === "hr" || cleanRole === "mentor") return "/hr-dashboard";
+    if (cleanRole === "hr") return "/hr-dashboard";
+    if (cleanRole === "mentor") return "/mentor-dashboard";
     if (cleanRole === "intern") return "/intern-dashboard";
 
     return "/";
@@ -188,9 +190,22 @@ function App() {
             <ProtectedRoute
               user={user}
               loading={loading}
-              allowedRoles={["hr", "mentor", "admin"]}
+              allowedRoles={["hr"]}
             >
               <HRDashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/mentor-dashboard"
+          element={
+            <ProtectedRoute
+              user={user}
+              loading={loading}
+              allowedRoles={["mentor"]}
+            >
+              <MentorDashboard />
             </ProtectedRoute>
           }
         />
@@ -209,7 +224,6 @@ function App() {
         />
 
         <Route path="/unauthorized" element={<UnauthorizedPage />} />
-
         <Route path="/session-expired" element={<SessionExpiredPage />} />
 
         <Route path="*" element={<NotFoundPage />} />
