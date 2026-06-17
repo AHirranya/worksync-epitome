@@ -1,6 +1,6 @@
 // Client/src/pages/AdminDashboard.jsx
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import api from "../api/api";
 import LoadingState from "../components/LoadingState";
 import EmptyState from "../components/EmptyState";
@@ -15,6 +15,10 @@ function AdminDashboard() {
 
   const [usersError, setUsersError] = useState("");
   const [departmentsError, setDepartmentsError] = useState("");
+
+  const [userSearch, setUserSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState("all");
+  const [departmentSearch, setDepartmentSearch] = useState("");
 
   const [userForm, setUserForm] = useState({
     fullName: "",
@@ -70,6 +74,34 @@ function AdminDashboard() {
   const loadData = async () => {
     await Promise.all([loadUsers(), loadDepartments()]);
   };
+
+  const filteredUsers = useMemo(() => {
+    const searchText = userSearch.trim().toLowerCase();
+
+    return users.filter((item) => {
+      const name = String(item.full_name || item.fullName || "").toLowerCase();
+      const email = String(item.email || "").toLowerCase();
+      const role = String(item.role || "").toLowerCase();
+
+      const matchesSearch =
+        !searchText || name.includes(searchText) || email.includes(searchText);
+
+      const matchesRole = roleFilter === "all" || role === roleFilter;
+
+      return matchesSearch && matchesRole;
+    });
+  }, [users, userSearch, roleFilter]);
+
+  const filteredDepartments = useMemo(() => {
+    const searchText = departmentSearch.trim().toLowerCase();
+
+    return departments.filter((dept) => {
+      const name = String(dept.name || "").toLowerCase();
+      const code = String(dept.code || "").toLowerCase();
+
+      return !searchText || name.includes(searchText) || code.includes(searchText);
+    });
+  }, [departments, departmentSearch]);
 
   const updateUserForm = (e) => {
     setUserForm({
@@ -220,6 +252,15 @@ function AdminDashboard() {
     }
   };
 
+  const clearUserFilters = () => {
+    setUserSearch("");
+    setRoleFilter("all");
+  };
+
+  const clearDepartmentFilters = () => {
+    setDepartmentSearch("");
+  };
+
   useEffect(() => {
     loadData();
   }, []);
@@ -325,7 +366,7 @@ function AdminDashboard() {
         <div className="panel-heading-row">
           <div>
             <h2>Users & Roles</h2>
-            <p>View all registered users and update their access roles.</p>
+            <p>Search users by name/email and filter by role.</p>
           </div>
 
           <button
@@ -336,6 +377,47 @@ function AdminDashboard() {
             Refresh
           </button>
         </div>
+
+        <div className="ws-filter-bar">
+          <div className="ws-filter-field">
+            <label>Search Users</label>
+            <input
+              type="text"
+              value={userSearch}
+              onChange={(e) => setUserSearch(e.target.value)}
+              placeholder="Search by name or email"
+            />
+          </div>
+
+          <div className="ws-filter-field">
+            <label>Role</label>
+            <select
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value)}
+            >
+              <option value="all">All Roles</option>
+              <option value="admin">Admin</option>
+              <option value="hr">HR</option>
+              <option value="mentor">Mentor</option>
+              <option value="intern">Intern</option>
+              <option value="user">Applicant / User</option>
+            </select>
+          </div>
+
+          <div className="ws-filter-actions">
+            <button
+              type="button"
+              className="outline-small-btn"
+              onClick={clearUserFilters}
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+
+        <p className="ws-result-count">
+          Showing {filteredUsers.length} of {users.length} users
+        </p>
 
         {usersLoading && <LoadingState type="table" />}
 
@@ -354,7 +436,14 @@ function AdminDashboard() {
           />
         )}
 
-        {!usersLoading && !usersError && users.length > 0 && (
+        {!usersLoading && !usersError && users.length > 0 && filteredUsers.length === 0 && (
+          <EmptyState
+            title="No matching users"
+            message="Try changing the search text or role filter."
+          />
+        )}
+
+        {!usersLoading && !usersError && filteredUsers.length > 0 && (
           <div className="table-wrapper">
             <table>
               <thead>
@@ -368,7 +457,7 @@ function AdminDashboard() {
               </thead>
 
               <tbody>
-                {users.map((item) => (
+                {filteredUsers.map((item) => (
                   <tr key={item.id}>
                     <td>{item.full_name || item.fullName || "-"}</td>
                     <td>{item.email}</td>
@@ -420,7 +509,7 @@ function AdminDashboard() {
         <div className="panel-heading-row">
           <div>
             <h2>Department Management</h2>
-            <p>Create and manage departments used during intern onboarding.</p>
+            <p>Create, search, and manage departments used during onboarding.</p>
           </div>
         </div>
 
@@ -456,6 +545,32 @@ function AdminDashboard() {
 
         <h3 className="section-subtitle">Departments</h3>
 
+        <div className="ws-filter-bar">
+          <div className="ws-filter-field ws-filter-wide">
+            <label>Search Departments</label>
+            <input
+              type="text"
+              value={departmentSearch}
+              onChange={(e) => setDepartmentSearch(e.target.value)}
+              placeholder="Search by department name or code"
+            />
+          </div>
+
+          <div className="ws-filter-actions">
+            <button
+              type="button"
+              className="outline-small-btn"
+              onClick={clearDepartmentFilters}
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+
+        <p className="ws-result-count">
+          Showing {filteredDepartments.length} of {departments.length} departments
+        </p>
+
         {departmentsLoading && <LoadingState type="table" />}
 
         {!departmentsLoading && departmentsError && (
@@ -473,45 +588,59 @@ function AdminDashboard() {
           />
         )}
 
-        {!departmentsLoading && !departmentsError && departments.length > 0 && (
-          <div className="table-wrapper">
-            <table>
-              <thead>
-                <tr>
-                  <th>Department</th>
-                  <th>Code</th>
-                  <th>Created</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
+        {!departmentsLoading &&
+          !departmentsError &&
+          departments.length > 0 &&
+          filteredDepartments.length === 0 && (
+            <EmptyState
+              title="No matching departments"
+              message="Try changing the search text."
+            />
+          )}
 
-              <tbody>
-                {departments.map((dept) => (
-                  <tr key={dept.id}>
-                    <td>{dept.name}</td>
-                    <td>
-                      <span className="status info">{dept.code}</span>
-                    </td>
-                    <td>
-                      {dept.created_at
-                        ? new Date(dept.created_at).toLocaleDateString("en-IN")
-                        : "-"}
-                    </td>
-                    <td>
-                      <button
-                        type="button"
-                        className="outline-small-btn"
-                        onClick={() => deleteDepartment(dept.id)}
-                      >
-                        Delete
-                      </button>
-                    </td>
+        {!departmentsLoading &&
+          !departmentsError &&
+          filteredDepartments.length > 0 && (
+            <div className="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Department</th>
+                    <th>Code</th>
+                    <th>Created</th>
+                    <th>Action</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                </thead>
+
+                <tbody>
+                  {filteredDepartments.map((dept) => (
+                    <tr key={dept.id}>
+                      <td>{dept.name}</td>
+                      <td>
+                        <span className="status info">{dept.code}</span>
+                      </td>
+                      <td>
+                        {dept.created_at
+                          ? new Date(dept.created_at).toLocaleDateString(
+                              "en-IN"
+                            )
+                          : "-"}
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className="outline-small-btn"
+                          onClick={() => deleteDepartment(dept.id)}
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
       </section>
     </main>
   );

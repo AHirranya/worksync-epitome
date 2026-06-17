@@ -1,6 +1,6 @@
 // Client/src/pages/HRDashboard.jsx
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import api from "../api/api";
 import LoadingState from "../components/LoadingState";
 import EmptyState from "../components/EmptyState";
@@ -22,6 +22,14 @@ function HRDashboard() {
   const [applicantsError, setApplicantsError] = useState("");
   const [internsError, setInternsError] = useState("");
   const [departmentsError, setDepartmentsError] = useState("");
+
+  const [applicantSearch, setApplicantSearch] = useState("");
+  const [applicantStatusFilter, setApplicantStatusFilter] = useState("all");
+  const [applicantDomainFilter, setApplicantDomainFilter] = useState("all");
+
+  const [internSearch, setInternSearch] = useState("");
+  const [internDepartmentFilter, setInternDepartmentFilter] = useState("all");
+  const [internStatusFilter, setInternStatusFilter] = useState("all");
 
   const [onboardingForm, setOnboardingForm] = useState({
     applicantId: "",
@@ -89,6 +97,104 @@ function HRDashboard() {
     await Promise.all([loadApplicants(), loadInterns(), loadDepartments()]);
   };
 
+  const applicantStatuses = useMemo(() => {
+    const values = applicants
+      .map((item) => item.status || "Applied")
+      .filter(Boolean);
+
+    return [...new Set(values)];
+  }, [applicants]);
+
+  const applicantDomains = useMemo(() => {
+    const values = applicants
+      .map((item) => item.preferred_domain || item.applied_role || "")
+      .filter(Boolean);
+
+    return [...new Set(values)];
+  }, [applicants]);
+
+  const internDepartments = useMemo(() => {
+    const values = interns
+      .map((item) => item.department_name || "")
+      .filter(Boolean);
+
+    return [...new Set(values)];
+  }, [interns]);
+
+  const internStatuses = useMemo(() => {
+    const values = interns
+      .map((item) => item.status || "Active")
+      .filter(Boolean);
+
+    return [...new Set(values)];
+  }, [interns]);
+
+  const filteredApplicants = useMemo(() => {
+    const searchText = applicantSearch.trim().toLowerCase();
+
+    return applicants.filter((applicant) => {
+      const name = String(applicant.full_name || "").toLowerCase();
+      const email = String(applicant.email || "").toLowerCase();
+      const college = String(applicant.college_name || "").toLowerCase();
+      const city = String(applicant.city || "").toLowerCase();
+      const skills = String(applicant.skills || "").toLowerCase();
+      const status = String(applicant.status || "Applied").toLowerCase();
+      const domain = String(
+        applicant.preferred_domain || applicant.applied_role || ""
+      ).toLowerCase();
+
+      const matchesSearch =
+        !searchText ||
+        name.includes(searchText) ||
+        email.includes(searchText) ||
+        college.includes(searchText) ||
+        city.includes(searchText) ||
+        skills.includes(searchText);
+
+      const matchesStatus =
+        applicantStatusFilter === "all" ||
+        status === applicantStatusFilter.toLowerCase();
+
+      const matchesDomain =
+        applicantDomainFilter === "all" ||
+        domain === applicantDomainFilter.toLowerCase();
+
+      return matchesSearch && matchesStatus && matchesDomain;
+    });
+  }, [applicants, applicantSearch, applicantStatusFilter, applicantDomainFilter]);
+
+  const filteredInterns = useMemo(() => {
+    const searchText = internSearch.trim().toLowerCase();
+
+    return interns.filter((intern) => {
+      const name = String(intern.full_name || "").toLowerCase();
+      const email = String(intern.email || "").toLowerCase();
+      const code = String(intern.intern_code || intern.intern_id || "").toLowerCase();
+      const department = String(intern.department_name || "").toLowerCase();
+      const status = String(intern.status || "Active").toLowerCase();
+
+      const matchesSearch =
+        !searchText ||
+        name.includes(searchText) ||
+        email.includes(searchText) ||
+        code.includes(searchText);
+
+      const matchesDepartment =
+        internDepartmentFilter === "all" ||
+        department === internDepartmentFilter.toLowerCase();
+
+      const matchesStatus =
+        internStatusFilter === "all" ||
+        status === internStatusFilter.toLowerCase();
+
+      return matchesSearch && matchesDepartment && matchesStatus;
+    });
+  }, [interns, internSearch, internDepartmentFilter, internStatusFilter]);
+
+  const availableApplicants = applicants.filter(
+    (item) => String(item.status || "").toLowerCase() !== "onboarded"
+  );
+
   const updateApplicantStatus = async (applicantId, status) => {
     try {
       const res = await api.patch(`/applicants/${applicantId}/status`, {
@@ -152,13 +258,21 @@ function HRDashboard() {
     }
   };
 
+  const clearApplicantFilters = () => {
+    setApplicantSearch("");
+    setApplicantStatusFilter("all");
+    setApplicantDomainFilter("all");
+  };
+
+  const clearInternFilters = () => {
+    setInternSearch("");
+    setInternDepartmentFilter("all");
+    setInternStatusFilter("all");
+  };
+
   useEffect(() => {
     loadData();
   }, []);
-
-  const availableApplicants = applicants.filter(
-    (item) => String(item.status || "").toLowerCase() !== "onboarded"
-  );
 
   return (
     <main className="dashboard-page">
@@ -249,7 +363,7 @@ function HRDashboard() {
           <div className="panel-heading-row">
             <div>
               <h2>Applicant Pipeline</h2>
-              <p>Review applications and shortlist candidates for onboarding.</p>
+              <p>Search, filter, shortlist, reject, and onboard applicants.</p>
             </div>
 
             <button
@@ -260,6 +374,64 @@ function HRDashboard() {
               Refresh
             </button>
           </div>
+
+          <div className="ws-filter-bar">
+            <div className="ws-filter-field ws-filter-wide">
+              <label>Search Applicants</label>
+              <input
+                type="text"
+                value={applicantSearch}
+                onChange={(e) => setApplicantSearch(e.target.value)}
+                placeholder="Search by name, email, city, college, or skills"
+              />
+            </div>
+
+            <div className="ws-filter-field">
+              <label>Status</label>
+              <select
+                value={applicantStatusFilter}
+                onChange={(e) => setApplicantStatusFilter(e.target.value)}
+              >
+                <option value="all">All Status</option>
+
+                {applicantStatuses.map((status) => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="ws-filter-field">
+              <label>Domain</label>
+              <select
+                value={applicantDomainFilter}
+                onChange={(e) => setApplicantDomainFilter(e.target.value)}
+              >
+                <option value="all">All Domains</option>
+
+                {applicantDomains.map((domain) => (
+                  <option key={domain} value={domain}>
+                    {domain}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="ws-filter-actions">
+              <button
+                type="button"
+                className="outline-small-btn"
+                onClick={clearApplicantFilters}
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+
+          <p className="ws-result-count">
+            Showing {filteredApplicants.length} of {applicants.length} applicants
+          </p>
 
           {applicantsLoading && <LoadingState type="table" />}
 
@@ -278,79 +450,94 @@ function HRDashboard() {
             />
           )}
 
-          {!applicantsLoading && !applicantsError && applicants.length > 0 && (
-            <div className="table-wrapper">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Applicant</th>
-                    <th>Email</th>
-                    <th>Preferred Domain</th>
-                    <th>Skills</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
+          {!applicantsLoading &&
+            !applicantsError &&
+            applicants.length > 0 &&
+            filteredApplicants.length === 0 && (
+              <EmptyState
+                title="No matching applicants"
+                message="Try changing the search text, status, or domain filter."
+              />
+            )}
 
-                <tbody>
-                  {applicants.map((applicant) => (
-                    <tr key={applicant.id}>
-                      <td>
-                        {applicant.full_name}
-                        <br />
-                        <span className="small-text">
-                          {applicant.college_name || applicant.city || "-"}
-                        </span>
-                      </td>
-                      <td>{applicant.email}</td>
-                      <td>
-                        {applicant.preferred_domain ||
-                          applicant.applied_role ||
-                          "-"}
-                      </td>
-                      <td>{applicant.skills || "-"}</td>
-                      <td>
-                        <span className="status selected">
-                          {applicant.status || "Applied"}
-                        </span>
-                      </td>
-                      <td>
-                        <div className="task-action-row">
-                          <button
-                            type="button"
-                            className="small-btn"
-                            onClick={() =>
-                              updateApplicantStatus(applicant.id, "Shortlisted")
-                            }
-                          >
-                            Shortlist
-                          </button>
-
-                          <button
-                            type="button"
-                            className="outline-small-btn"
-                            onClick={() =>
-                              updateApplicantStatus(applicant.id, "Rejected")
-                            }
-                          >
-                            Reject
-                          </button>
-
-                          <button
-                            type="button"
-                            className="outline-small-btn"
-                            onClick={() => selectForOnboarding(applicant)}
-                          >
-                            Onboard
-                          </button>
-                        </div>
-                      </td>
+          {!applicantsLoading &&
+            !applicantsError &&
+            filteredApplicants.length > 0 && (
+              <div className="table-wrapper">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Applicant</th>
+                      <th>Email</th>
+                      <th>Preferred Domain</th>
+                      <th>Skills</th>
+                      <th>Status</th>
+                      <th>Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                  </thead>
+
+                  <tbody>
+                    {filteredApplicants.map((applicant) => (
+                      <tr key={applicant.id}>
+                        <td>
+                          {applicant.full_name}
+                          <br />
+                          <span className="small-text">
+                            {applicant.college_name || applicant.city || "-"}
+                          </span>
+                        </td>
+                        <td>{applicant.email}</td>
+                        <td>
+                          {applicant.preferred_domain ||
+                            applicant.applied_role ||
+                            "-"}
+                        </td>
+                        <td>{applicant.skills || "-"}</td>
+                        <td>
+                          <span className="status selected">
+                            {applicant.status || "Applied"}
+                          </span>
+                        </td>
+                        <td>
+                          <div className="task-action-row">
+                            <button
+                              type="button"
+                              className="small-btn"
+                              onClick={() =>
+                                updateApplicantStatus(
+                                  applicant.id,
+                                  "Shortlisted"
+                                )
+                              }
+                            >
+                              Shortlist
+                            </button>
+
+                            <button
+                              type="button"
+                              className="outline-small-btn"
+                              onClick={() =>
+                                updateApplicantStatus(applicant.id, "Rejected")
+                              }
+                            >
+                              Reject
+                            </button>
+
+                            <button
+                              type="button"
+                              className="outline-small-btn"
+                              onClick={() => selectForOnboarding(applicant)}
+                            >
+                              Onboard
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
         </section>
       )}
 
@@ -454,7 +641,7 @@ function HRDashboard() {
           <div className="panel-heading-row">
             <div>
               <h2>Onboarded Interns</h2>
-              <p>View active interns and their assigned departments.</p>
+              <p>Search interns by name/email and filter by department/status.</p>
             </div>
 
             <button
@@ -465,6 +652,64 @@ function HRDashboard() {
               Refresh
             </button>
           </div>
+
+          <div className="ws-filter-bar">
+            <div className="ws-filter-field ws-filter-wide">
+              <label>Search Interns</label>
+              <input
+                type="text"
+                value={internSearch}
+                onChange={(e) => setInternSearch(e.target.value)}
+                placeholder="Search by name, email, or intern code"
+              />
+            </div>
+
+            <div className="ws-filter-field">
+              <label>Department</label>
+              <select
+                value={internDepartmentFilter}
+                onChange={(e) => setInternDepartmentFilter(e.target.value)}
+              >
+                <option value="all">All Departments</option>
+
+                {internDepartments.map((department) => (
+                  <option key={department} value={department}>
+                    {department}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="ws-filter-field">
+              <label>Status</label>
+              <select
+                value={internStatusFilter}
+                onChange={(e) => setInternStatusFilter(e.target.value)}
+              >
+                <option value="all">All Status</option>
+
+                {internStatuses.map((status) => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="ws-filter-actions">
+              <button
+                type="button"
+                className="outline-small-btn"
+                onClick={clearInternFilters}
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+
+          <p className="ws-result-count">
+            Showing {filteredInterns.length} of {interns.length} interns
+          </p>
 
           {internsLoading && <LoadingState type="table" />}
 
@@ -483,7 +728,17 @@ function HRDashboard() {
             />
           )}
 
-          {!internsLoading && !internsError && interns.length > 0 && (
+          {!internsLoading &&
+            !internsError &&
+            interns.length > 0 &&
+            filteredInterns.length === 0 && (
+              <EmptyState
+                title="No matching interns"
+                message="Try changing the search text, department, or status filter."
+              />
+            )}
+
+          {!internsLoading && !internsError && filteredInterns.length > 0 && (
             <div className="table-wrapper">
               <table>
                 <thead>
@@ -498,7 +753,7 @@ function HRDashboard() {
                 </thead>
 
                 <tbody>
-                  {interns.map((intern) => (
+                  {filteredInterns.map((intern) => (
                     <tr key={intern.id}>
                       <td>
                         {intern.full_name}

@@ -4014,3 +4014,81 @@ tbody tr:hover {
     grid-template-columns: 1fr 1fr 1fr 1fr;
   }
 }
+/* STEP 5 ONLY: SEARCH AND FILTER BAR */
+
+.ws-filter-bar {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1.4fr 0.8fr 0.8fr auto;
+  gap: 14px;
+  align-items: end;
+  padding: 18px;
+  border: 1px solid rgba(255, 122, 0, 0.18);
+  border-radius: 18px;
+  background: rgba(255, 122, 0, 0.045);
+  margin: 18px 0 14px;
+}
+
+.ws-filter-field {
+  display: grid;
+  gap: 8px;
+}
+
+.ws-filter-field label {
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.ws-filter-field input,
+.ws-filter-field select {
+  min-height: 48px;
+}
+
+.ws-filter-wide {
+  min-width: 260px;
+}
+
+.ws-filter-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.ws-result-count {
+  color: #bdbdbd;
+  font-size: 14px;
+  font-weight: 800;
+  margin: 0 0 16px;
+}
+
+@media (max-width: 1000px) {
+  .ws-filter-bar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ws-filter-actions {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 650px) {
+  .ws-filter-bar {
+    grid-template-columns: 1fr;
+    padding: 14px;
+  }
+
+  .ws-filter-wide {
+    min-width: 0;
+  }
+
+  .ws-filter-actions {
+    width: 100%;
+  }
+
+  .ws-filter-actions button {
+    width: 100%;
+  }
+}
