@@ -6,18 +6,25 @@ const pool = require("../config/db");
 
 const router = express.Router();
 
-const JWT_SECRET = process.env.JWT_SECRET || "worksync_secret_key";
+const JWT_SECRET = process.env.JWT_SECRET || "worksync_secret_key_change_this";
+
+const getTokenFromRequest = (req) => {
+  const cookieToken = req.cookies?.token;
+
+  const authHeader = req.headers.authorization;
+  const bearerToken =
+    authHeader && authHeader.startsWith("Bearer ")
+      ? authHeader.replace("Bearer ", "")
+      : null;
+
+  return cookieToken || bearerToken || null;
+};
 
 const getUserFromRequest = async (req) => {
   try {
-    const token =
-      req.cookies?.token ||
-      req.headers.authorization?.replace("Bearer ", "") ||
-      null;
+    const token = getTokenFromRequest(req);
 
-    if (!token) {
-      return null;
-    }
+    if (!token) return null;
 
     const decoded = jwt.verify(token, JWT_SECRET);
 
@@ -53,32 +60,11 @@ router.post("/", async (req, res) => {
       });
     }
 
-    const { summary, hoursWorked, blockers, overtimeReason } = req.body;
+    const { summary, blockers } = req.body;
 
     if (!summary || !String(summary).trim()) {
       return res.status(400).json({
         message: "Work summary is required.",
-      });
-    }
-
-    if (!hoursWorked && Number(hoursWorked) !== 0) {
-      return res.status(400).json({
-        message: "Hours worked is required.",
-      });
-    }
-
-    const cleanHours = Number(hoursWorked);
-
-    if (Number.isNaN(cleanHours) || cleanHours <= 0) {
-      return res.status(400).json({
-        message: "Hours worked must be greater than 0.",
-      });
-    }
-
-    if (cleanHours > 8 && !String(overtimeReason || "").trim()) {
-      return res.status(400).json({
-        message:
-          "You worked more than 8 hours. Overtime reason is required before submitting.",
       });
     }
 
@@ -99,6 +85,46 @@ router.post("/", async (req, res) => {
     }
 
     const internId = internResult.rows[0].id;
+
+    const attendanceResult = await pool.query(
+      `
+      SELECT
+        id,
+        check_in,
+        check_out,
+        net_work_minutes,
+        overtime_reason
+      FROM attendance
+      WHERE intern_id = $1
+      AND attendance_date = CURRENT_DATE
+      LIMIT 1
+      `,
+      [internId]
+    );
+
+    if (attendanceResult.rows.length === 0) {
+      return res.status(400).json({
+        message: "Please mark attendance before submitting work log.",
+      });
+    }
+
+    const attendance = attendanceResult.rows[0];
+
+    if (!attendance.check_out) {
+      return res.status(400).json({
+        message: "Please check out before submitting today's work log.",
+      });
+    }
+
+    const netWorkMinutes = Number(attendance.net_work_minutes || 0);
+    const hoursWorked = Number((netWorkMinutes / 60).toFixed(2));
+
+    if (netWorkMinutes > 480 && !attendance.overtime_reason) {
+      return res.status(400).json({
+        message:
+          "Overtime reason is missing. Please submit overtime reason during checkout.",
+      });
+    }
 
     const existingLog = await pool.query(
       `
@@ -122,6 +148,7 @@ router.post("/", async (req, res) => {
       INSERT INTO work_logs
       (
         intern_id,
+        attendance_id,
         log_date,
         summary,
         hours_worked,
@@ -129,15 +156,16 @@ router.post("/", async (req, res) => {
         overtime_reason,
         status
       )
-      VALUES ($1, CURRENT_DATE, $2, $3, $4, $5, 'Submitted')
+      VALUES ($1, $2, CURRENT_DATE, $3, $4, $5, $6, 'Submitted')
       RETURNING *
       `,
       [
         internId,
-        summary.trim(),
-        cleanHours,
-        blockers ? blockers.trim() : null,
-        cleanHours > 8 ? overtimeReason.trim() : null,
+        attendance.id,
+        String(summary).trim(),
+        hoursWorked,
+        blockers ? String(blockers).trim() : null,
+        attendance.overtime_reason || null,
       ]
     );
 
@@ -184,18 +212,22 @@ router.get("/my", async (req, res) => {
     const result = await pool.query(
       `
       SELECT
-        id,
-        intern_id,
-        log_date,
-        summary,
-        hours_worked,
-        blockers,
-        overtime_reason,
-        status,
-        created_at
-      FROM work_logs
-      WHERE intern_id = $1
-      ORDER BY log_date DESC, created_at DESC
+        wl.id,
+        wl.intern_id,
+        wl.attendance_id,
+        wl.log_date,
+        wl.summary,
+        wl.hours_worked,
+        wl.blockers,
+        wl.overtime_reason,
+        wl.status,
+        wl.created_at,
+        a.total_break_minutes,
+        a.net_work_minutes
+      FROM work_logs wl
+      LEFT JOIN attendance a ON a.id = wl.attendance_id
+      WHERE wl.intern_id = $1
+      ORDER BY wl.log_date DESC, wl.created_at DESC
       `,
       [internId]
     );
@@ -239,10 +271,13 @@ router.get("/hr", async (req, res) => {
         wl.created_at,
         i.full_name AS intern_name,
         i.email AS intern_email,
-        d.name AS department_name
+        d.name AS department_name,
+        a.total_break_minutes,
+        a.net_work_minutes
       FROM work_logs wl
       JOIN interns i ON i.id = wl.intern_id
       LEFT JOIN departments d ON d.id = i.department_id
+      LEFT JOIN attendance a ON a.id = wl.attendance_id
       ORDER BY wl.log_date DESC, wl.created_at DESC
     `);
 

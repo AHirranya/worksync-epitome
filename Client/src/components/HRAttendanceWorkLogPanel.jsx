@@ -37,6 +37,16 @@ function HRAttendanceWorkLogPanel() {
     }).format(new Date(dateValue));
   };
 
+  const formatDuration = (minutes) => {
+    const cleanMinutes = Math.max(0, Number(minutes || 0));
+    const hrs = Math.floor(cleanMinutes / 60);
+    const mins = cleanMinutes % 60;
+
+    if (hrs === 0) return `${mins} min`;
+
+    return `${hrs} hr ${mins} min`;
+  };
+
   const loadAttendance = async () => {
     const res = await api.get("/attendance/hr");
     setAttendance(res.data.attendance || []);
@@ -82,10 +92,10 @@ function HRAttendanceWorkLogPanel() {
 
   return (
     <section className="panel">
-      <h2>Attendance & Work Logs</h2>
+      <h2>Attendance, Breaks & Work Logs</h2>
       <p>
-        Standard internship work time is <strong>8 hours</strong>. If an intern
-        works more than 8 hours, overtime reason must be submitted.
+        HR can view check-in, check-out, break time, net work time, overtime
+        reason, and submitted work logs.
       </p>
 
       {message && (
@@ -105,6 +115,10 @@ function HRAttendanceWorkLogPanel() {
               <th>Department</th>
               <th>Check-in</th>
               <th>Check-out</th>
+              <th>Breaks</th>
+              <th>Total Break</th>
+              <th>Net Work</th>
+              <th>Overtime Reason</th>
               <th>Status</th>
             </tr>
           </thead>
@@ -112,7 +126,7 @@ function HRAttendanceWorkLogPanel() {
           <tbody>
             {attendance.length === 0 && (
               <tr>
-                <td colSpan="6">No attendance records yet.</td>
+                <td colSpan="10">No attendance records yet.</td>
               </tr>
             )}
 
@@ -133,6 +147,10 @@ function HRAttendanceWorkLogPanel() {
                   {formatTimeIST(item.check_out)}
                   {item.check_out ? " IST" : ""}
                 </td>
+                <td>{item.break_count || 0}</td>
+                <td>{formatDuration(item.total_break_minutes)}</td>
+                <td>{formatDuration(item.net_work_minutes)}</td>
+                <td>{item.overtime_reason || "-"}</td>
                 <td>
                   <span className="status selected">{item.status}</span>
                 </td>
@@ -169,14 +187,27 @@ function HRAttendanceWorkLogPanel() {
               <strong>Summary:</strong> {log.summary}
             </p>
 
-            <p>
-              <strong>Hours Worked:</strong> {log.hours_worked || 0}
-            </p>
+            <div className="ws-log-metrics">
+              <div>
+                <span>Hours Worked</span>
+                <strong>{log.hours_worked || 0} hrs</strong>
+              </div>
 
-            {Number(log.hours_worked) > 8 && (
+              <div>
+                <span>Total Break</span>
+                <strong>{formatDuration(log.total_break_minutes)}</strong>
+              </div>
+
+              <div>
+                <span>Net Work</span>
+                <strong>{formatDuration(log.net_work_minutes)}</strong>
+              </div>
+            </div>
+
+            {log.overtime_reason && (
               <div className="overtime-box">
                 <strong>Overtime Reason:</strong>
-                <p>{log.overtime_reason || "No reason provided"}</p>
+                <p>{log.overtime_reason}</p>
               </div>
             )}
 

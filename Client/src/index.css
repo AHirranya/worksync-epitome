@@ -4479,3 +4479,129 @@ tbody tr:hover {
     padding: 16px;
   }
 }
+/* STEP 7: ATTENDANCE BREAKS + NET WORK HOURS */
+
+.ws-attendance-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px;
+  margin-top: 22px;
+}
+
+.ws-attendance-card {
+  background: #0b0b0b;
+  border: 1px solid rgba(255, 122, 0, 0.18);
+  border-radius: 22px;
+  padding: 24px;
+}
+
+.ws-attendance-card h3 {
+  color: #ffffff;
+  margin-bottom: 18px;
+}
+
+.ws-attendance-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.ws-attendance-metrics > div {
+  background: #101010;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 16px;
+}
+
+.ws-attendance-metrics span,
+.ws-worklog-note span,
+.ws-log-metrics span {
+  display: block;
+  color: #9f9f9f;
+  font-size: 13px;
+  font-weight: 900;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.ws-attendance-metrics strong,
+.ws-worklog-note strong,
+.ws-log-metrics strong {
+  color: #ffffff;
+  font-size: 17px;
+}
+
+.ws-break-active {
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 122, 0, 0.35);
+  background: rgba(255, 122, 0, 0.1);
+  color: #ff7a00;
+  font-weight: 900;
+  margin-bottom: 18px;
+}
+
+.ws-overtime-box {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 122, 0, 0.35);
+  background: rgba(255, 122, 0, 0.08);
+  margin-bottom: 18px;
+}
+
+.ws-overtime-box strong {
+  color: #ff7a00;
+}
+
+.ws-overtime-box p {
+  color: #ffffff;
+}
+
+.ws-overtime-box textarea {
+  min-height: 100px;
+}
+
+.ws-worklog-note {
+  padding: 16px;
+  border-radius: 16px;
+  background: rgba(255, 122, 0, 0.08);
+  border: 1px solid rgba(255, 122, 0, 0.22);
+  margin-bottom: 16px;
+}
+
+.ws-log-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.ws-log-metrics > div {
+  background: #101010;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 14px;
+}
+
+@media (max-width: 900px) {
+  .ws-attendance-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ws-log-metrics {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .ws-attendance-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .ws-attendance-card {
+    padding: 18px;
+  }
+}
