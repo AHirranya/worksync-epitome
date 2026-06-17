@@ -80,6 +80,31 @@ function App() {
       if (loggedInUser) {
         localStorage.setItem("worksync_user", JSON.stringify(loggedInUser));
         setUser(loggedInUser);
+
+        const roleDashboard = getDashboardPath(loggedInUser.role);
+
+        if (
+          String(loggedInUser.role).toLowerCase() === "mentor" &&
+          window.location.pathname === "/hr-dashboard"
+        ) {
+          window.location.replace("/mentor-dashboard");
+        }
+
+        if (
+          String(loggedInUser.role).toLowerCase() === "hr" &&
+          window.location.pathname === "/mentor-dashboard"
+        ) {
+          window.location.replace("/hr-dashboard");
+        }
+
+        if (
+          String(loggedInUser.role).toLowerCase() === "intern" &&
+          (window.location.pathname === "/hr-dashboard" ||
+            window.location.pathname === "/mentor-dashboard" ||
+            window.location.pathname === "/admin-dashboard")
+        ) {
+          window.location.replace(roleDashboard);
+        }
       } else {
         clearSession();
       }
@@ -105,6 +130,9 @@ function App() {
     if (loggedInUser) {
       localStorage.setItem("worksync_user", JSON.stringify(loggedInUser));
       setUser(loggedInUser);
+
+      const path = getDashboardPath(loggedInUser.role);
+      window.location.replace(path);
     }
   };
 

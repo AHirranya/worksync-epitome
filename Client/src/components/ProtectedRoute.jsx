@@ -19,6 +19,17 @@ function safeParseUser() {
   }
 }
 
+function getDashboardPath(role) {
+  const cleanRole = String(role || "").toLowerCase();
+
+  if (cleanRole === "admin") return "/admin-dashboard";
+  if (cleanRole === "hr") return "/hr-dashboard";
+  if (cleanRole === "mentor") return "/mentor-dashboard";
+  if (cleanRole === "intern") return "/intern-dashboard";
+
+  return "/login";
+}
+
 function ProtectedRoute({ user, loading, allowedRoles, children }) {
   const storedUser = safeParseUser();
   const token = localStorage.getItem("worksync_token");
@@ -40,6 +51,10 @@ function ProtectedRoute({ user, loading, allowedRoles, children }) {
   }
 
   if (!token || token === "undefined" || token === "null" || !activeUser) {
+    localStorage.removeItem("worksync_user");
+    localStorage.removeItem("worksync_token");
+    localStorage.removeItem("worksync_manual_logout");
+
     return <Navigate to="/login" replace />;
   }
 
@@ -50,7 +65,7 @@ function ProtectedRoute({ user, loading, allowedRoles, children }) {
     : [];
 
   if (cleanAllowedRoles.length > 0 && !cleanAllowedRoles.includes(userRole)) {
-    return <Navigate to="/unauthorized" replace />;
+    return <Navigate to={getDashboardPath(userRole)} replace />;
   }
 
   return children;
