@@ -1,40 +1,35 @@
 // Client/src/components/ProtectedRoute.jsx
 
 import { Navigate } from "react-router-dom";
-import LoadingState from "./LoadingState";
-import ErrorState from "./ErrorState";
 
 function ProtectedRoute({ user, loading, allowedRoles, children }) {
+  const storedUser = JSON.parse(localStorage.getItem("worksync_user") || "null");
+  const token = localStorage.getItem("worksync_token");
+
+  const activeUser = user || storedUser;
+
   if (loading) {
     return (
       <main className="dashboard-page">
         <section className="panel">
-          <LoadingState
-            title="Checking session"
-            message="Please wait while we verify your login session."
-          />
+          <div className="route-loading-box">
+            <div className="route-loader"></div>
+            <h3>Checking session</h3>
+            <p>Please wait while we verify your login session.</p>
+          </div>
         </section>
       </main>
     );
   }
 
-  if (!user) {
-    return <Navigate to="/login" replace />;
+  if (!token || !activeUser) {
+    return <Navigate to="/session-expired" replace />;
   }
 
-  const userRole = String(user.role || "").toLowerCase();
+  const userRole = String(activeUser.role || "").toLowerCase();
 
   if (allowedRoles && !allowedRoles.includes(userRole)) {
-    return (
-      <main className="dashboard-page">
-        <section className="panel">
-          <ErrorState
-            title="Access Denied"
-            message="You do not have permission to access this dashboard."
-          />
-        </section>
-      </main>
-    );
+    return <Navigate to="/unauthorized" replace />;
   }
 
   return children;

@@ -27,10 +27,22 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     const status = error.response?.status;
+    const requestUrl = String(error.config?.url || "");
 
-    if (status === 401) {
+    const isAuthRequest =
+      requestUrl.includes("/auth/login") ||
+      requestUrl.includes("/auth/register");
+
+    if (status === 401 && !isAuthRequest) {
       localStorage.removeItem("worksync_user");
       localStorage.removeItem("worksync_token");
+
+      if (
+        window.location.pathname !== "/login" &&
+        window.location.pathname !== "/session-expired"
+      ) {
+        window.location.href = "/session-expired";
+      }
     }
 
     return Promise.reject(error);

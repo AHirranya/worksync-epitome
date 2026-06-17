@@ -1,107 +1,146 @@
 // Client/src/App.jsx
 
 import { useEffect, useState } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import {
+  BrowserRouter,
+  Navigate,
+  Route,
+  Routes,
+} from "react-router-dom";
+
 import api from "./api/api";
 
 import Navbar from "./components/Navbar";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 import HomePage from "./pages/HomePage";
-import ApplyPage from "./pages/ApplyPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
+
 import AdminDashboard from "./pages/AdminDashboard";
 import HRDashboard from "./pages/HRDashboard";
 import InternDashboard from "./pages/InternDashboard";
 
-function DashboardRedirect({ user, loading }) {
-  if (loading) {
-    return (
-      <main className="dashboard-page">
-        <div className="dashboard-header">
-          <h1>Loading Dashboard</h1>
-          <p>Please wait while we verify your session.</p>
-        </div>
-      </main>
-    );
-  }
-
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
-
-  const role = String(user.role || "").toLowerCase();
-
-  if (role === "admin") {
-    return <Navigate to="/admin-dashboard" replace />;
-  }
-
-  if (role === "hr" || role === "mentor") {
-    return <Navigate to="/hr-dashboard" replace />;
-  }
-
-  if (role === "intern") {
-    return <Navigate to="/intern-dashboard" replace />;
-  }
-
-  return <Navigate to="/" replace />;
-}
+import NotFoundPage from "./pages/NotFoundPage";
+import UnauthorizedPage from "./pages/UnauthorizedPage";
+import SessionExpiredPage from "./pages/SessionExpiredPage";
 
 function App() {
-  const [user, setUser] = useState(null);
-  const [authLoading, setAuthLoading] = useState(true);
+  const [user, setUser] = useState(() => {
+    return JSON.parse(localStorage.getItem("worksync_user") || "null");
+  });
 
-  const loadLoggedUser = async () => {
-    setAuthLoading(true);
+  const [loading, setLoading] = useState(true);
 
-    const savedUser = localStorage.getItem("worksync_user");
-    const savedToken = localStorage.getItem("worksync_token");
+  const getDashboardPath = (role) => {
+    const cleanRole = String(role || "").toLowerCase();
 
-    if (savedUser && savedToken) {
-      try {
-        setUser(JSON.parse(savedUser));
-      } catch (error) {
-        setUser(null);
-        localStorage.removeItem("worksync_user");
-        localStorage.removeItem("worksync_token");
-      }
-    }
+    if (cleanRole === "admin") return "/admin-dashboard";
+    if (cleanRole === "hr" || cleanRole === "mentor") return "/hr-dashboard";
+    if (cleanRole === "intern") return "/intern-dashboard";
 
+    return "/";
+  };
+
+  const loadLoggedInUser = async () => {
     try {
+      const token = localStorage.getItem("worksync_token");
+
+      if (!token) {
+        setUser(null);
+        setLoading(false);
+        return;
+      }
+
       const res = await api.get("/auth/me");
 
-      setUser(res.data.user);
-      localStorage.setItem("worksync_user", JSON.stringify(res.data.user));
+      const loggedInUser = res.data.user;
+
+      if (loggedInUser) {
+        localStorage.setItem("worksync_user", JSON.stringify(loggedInUser));
+        setUser(loggedInUser);
+      } else {
+        localStorage.removeItem("worksync_user");
+        localStorage.removeItem("worksync_token");
+        setUser(null);
+      }
     } catch (error) {
-      setUser(null);
       localStorage.removeItem("worksync_user");
       localStorage.removeItem("worksync_token");
+      setUser(null);
     } finally {
-      setAuthLoading(false);
+      setLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await api.post("/auth/logout");
+    } catch (error) {
+      // logout should continue even if backend logout fails
+    }
+
+    localStorage.removeItem("worksync_user");
+    localStorage.removeItem("worksync_token");
+
+    setUser(null);
+
+    window.location.href = "/login";
+  };
+
+  const handleLoginSuccess = (loggedInUser, token) => {
+    if (token) {
+      localStorage.setItem("worksync_token", token);
+    }
+
+    if (loggedInUser) {
+      localStorage.setItem("worksync_user", JSON.stringify(loggedInUser));
+      setUser(loggedInUser);
     }
   };
 
   useEffect(() => {
-    loadLoggedUser();
+    loadLoggedInUser();
   }, []);
 
   return (
-    <>
-      <Navbar user={user} setUser={setUser} />
+    <BrowserRouter>
+      <Navbar user={user} onLogout={handleLogout} logout={handleLogout} />
 
       <Routes>
         <Route path="/" element={<HomePage />} />
 
-        <Route path="/apply" element={<ApplyPage />} />
+        <Route
+          path="/login"
+          element={
+            user ? (
+              <Navigate to={getDashboardPath(user.role)} replace />
+            ) : (
+              <LoginPage setUser={setUser} onLoginSuccess={handleLoginSuccess} />
+            )
+          }
+        />
 
-        <Route path="/login" element={<LoginPage setUser={setUser} />} />
+        <Route
+          path="/register"
+          element={
+            user ? (
+              <Navigate to={getDashboardPath(user.role)} replace />
+            ) : (
+              <RegisterPage />
+            )
+          }
+        />
 
-        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/apply" element={<Navigate to="/register" replace />} />
 
         <Route
           path="/dashboard"
-          element={<DashboardRedirect user={user} loading={authLoading} />}
+          element={
+            <ProtectedRoute user={user} loading={loading}>
+              <Navigate to={getDashboardPath(user?.role)} replace />
+            </ProtectedRoute>
+          }
         />
 
         <Route
@@ -109,7 +148,7 @@ function App() {
           element={
             <ProtectedRoute
               user={user}
-              loading={authLoading}
+              loading={loading}
               allowedRoles={["admin"]}
             >
               <AdminDashboard />
@@ -122,7 +161,7 @@ function App() {
           element={
             <ProtectedRoute
               user={user}
-              loading={authLoading}
+              loading={loading}
               allowedRoles={["hr", "mentor", "admin"]}
             >
               <HRDashboard />
@@ -135,7 +174,7 @@ function App() {
           element={
             <ProtectedRoute
               user={user}
-              loading={authLoading}
+              loading={loading}
               allowedRoles={["intern"]}
             >
               <InternDashboard />
@@ -143,9 +182,12 @@ function App() {
           }
         />
 
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="/unauthorized" element={<UnauthorizedPage />} />
+        <Route path="/session-expired" element={<SessionExpiredPage />} />
+
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
-    </>
+    </BrowserRouter>
   );
 }
 
