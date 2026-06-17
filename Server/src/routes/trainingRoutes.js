@@ -6,18 +6,25 @@ const pool = require("../config/db");
 
 const router = express.Router();
 
-const JWT_SECRET = process.env.JWT_SECRET || "worksync_secret_key";
+const JWT_SECRET = process.env.JWT_SECRET || "worksync_secret_key_change_this";
+
+const getTokenFromRequest = (req) => {
+  const cookieToken = req.cookies?.token;
+
+  const authHeader = req.headers.authorization;
+  const bearerToken =
+    authHeader && authHeader.startsWith("Bearer ")
+      ? authHeader.replace("Bearer ", "")
+      : null;
+
+  return cookieToken || bearerToken || null;
+};
 
 const getUserFromRequest = async (req) => {
   try {
-    const token =
-      req.cookies?.token ||
-      req.headers.authorization?.replace("Bearer ", "") ||
-      null;
+    const token = getTokenFromRequest(req);
 
-    if (!token) {
-      return null;
-    }
+    if (!token) return null;
 
     const decoded = jwt.verify(token, JWT_SECRET);
 
@@ -37,98 +44,432 @@ const getUserFromRequest = async (req) => {
   }
 };
 
-const updateAssignmentStatus = async (assignmentId) => {
-  const progressResult = await pool.query(
+const requireLogin = async (req, res) => {
+  const user = await getUserFromRequest(req);
+
+  if (!user) {
+    res.status(401).json({
+      message: "Please login first.",
+    });
+
+    return null;
+  }
+
+  return user;
+};
+
+const requireRoles = (user, roles, res) => {
+  if (!roles.includes(user.role)) {
+    res.status(403).json({
+      message: "You do not have permission for this action.",
+    });
+
+    return false;
+  }
+
+  return true;
+};
+
+const getInternByUserEmail = async (email) => {
+  const result = await pool.query(
     `
-    SELECT
-      COUNT(tm.id)::int AS total_modules,
-      COUNT(CASE WHEN tp.is_completed = true THEN 1 END)::int AS completed_modules
-    FROM training_assignments ta
-    JOIN training_modules tm ON tm.course_id = ta.course_id
-    LEFT JOIN training_progress tp
-      ON tp.assignment_id = ta.id
-      AND tp.module_id = tm.id
-    WHERE ta.id = $1
+    SELECT id, full_name, email, department_id
+    FROM interns
+    WHERE LOWER(email) = LOWER($1)
+    LIMIT 1
     `,
-    [assignmentId]
+    [email]
   );
 
-  const progress = progressResult.rows[0];
+  return result.rows[0] || null;
+};
 
-  if (
-    Number(progress.total_modules) > 0 &&
-    Number(progress.total_modules) === Number(progress.completed_modules)
-  ) {
-    await pool.query(
-      `
-      UPDATE training_assignments
-      SET status = 'Completed'
-      WHERE id = $1
-      `,
-      [assignmentId]
-    );
-  } else if (Number(progress.completed_modules) > 0) {
-    await pool.query(
-      `
-      UPDATE training_assignments
-      SET status = 'In Progress'
-      WHERE id = $1
-      `,
-      [assignmentId]
-    );
+const normalizeQuestions = (questions) => {
+  if (!questions) return [];
+
+  if (Array.isArray(questions)) return questions;
+
+  try {
+    return JSON.parse(questions);
+  } catch (error) {
+    return [];
   }
 };
 
-router.get("/assignments", async (req, res) => {
-  try {
-    const result = await pool.query(`
-      SELECT
-        ta.id,
-        ta.status,
-        ta.assigned_at,
-        i.intern_id,
-        i.full_name AS intern_name,
-        i.email AS intern_email,
-        d.name AS department_name,
-        tc.title AS course_title,
-        COUNT(tm.id)::int AS total_modules,
-        COUNT(CASE WHEN tp.is_completed = true THEN 1 END)::int AS completed_modules,
+const getModuleById = async (moduleId) => {
+  const result = await pool.query(
+    `
+    SELECT
+      id,
+      course_id,
+      title,
+      description,
+      module_type,
+      theory_content,
+      content,
+      video_url,
+      module_order,
+      estimated_minutes,
+      passing_score,
+      test_questions
+    FROM training_modules
+    WHERE id = $1
+    LIMIT 1
+    `,
+    [moduleId]
+  );
+
+  return result.rows[0] || null;
+};
+
+const checkInternAssignedToCourse = async (internId, courseId) => {
+  const result = await pool.query(
+    `
+    SELECT id
+    FROM training_assignments
+    WHERE intern_id = $1
+    AND course_id = $2
+    LIMIT 1
+    `,
+    [internId, courseId]
+  );
+
+  return result.rows.length > 0;
+};
+
+const checkPreviousModulesCompleted = async (internId, module) => {
+  const currentOrder = Number(module.module_order || module.id);
+
+  const result = await pool.query(
+    `
+    SELECT COUNT(*) AS count
+    FROM training_modules tm
+    LEFT JOIN training_progress tp
+      ON tp.module_id = tm.id
+      AND tp.intern_id = $1
+    WHERE tm.course_id = $2
+    AND COALESCE(tm.module_order, tm.id) < $3
+    AND LOWER(COALESCE(tp.status, '')) <> 'completed'
+    `,
+    [internId, module.course_id, currentOrder]
+  );
+
+  return Number(result.rows[0]?.count || 0) === 0;
+};
+
+const upsertProgress = async ({
+  internId,
+  moduleId,
+  status,
+  score = 0,
+  answers = {},
+}) => {
+  const result = await pool.query(
+    `
+    INSERT INTO training_progress
+    (
+      intern_id,
+      module_id,
+      status,
+      score,
+      answers,
+      attempt_count,
+      completed_at,
+      updated_at
+    )
+    VALUES
+    (
+      $1,
+      $2,
+      $3,
+      $4,
+      $5,
+      1,
+      CASE WHEN $3 = 'completed' THEN CURRENT_TIMESTAMP ELSE NULL END,
+      CURRENT_TIMESTAMP
+    )
+    ON CONFLICT (intern_id, module_id)
+    DO UPDATE SET
+      status = EXCLUDED.status,
+      score = EXCLUDED.score,
+      answers = EXCLUDED.answers,
+      attempt_count = training_progress.attempt_count + 1,
+      completed_at =
         CASE
-          WHEN COUNT(tm.id) = 0 THEN 0
-          ELSE ROUND(
-            (COUNT(CASE WHEN tp.is_completed = true THEN 1 END)::decimal / COUNT(tm.id)) * 100
-          )
-        END AS progress_percent
-      FROM training_assignments ta
-      JOIN interns i ON i.id = ta.intern_id
-      JOIN training_courses tc ON tc.id = ta.course_id
-      LEFT JOIN departments d ON d.id = tc.department_id
-      LEFT JOIN training_modules tm ON tm.course_id = tc.id
-      LEFT JOIN training_progress tp
-        ON tp.assignment_id = ta.id
-        AND tp.module_id = tm.id
-      GROUP BY ta.id, i.intern_id, i.full_name, i.email, d.name, tc.title
-      ORDER BY ta.assigned_at DESC
-    `);
+          WHEN EXCLUDED.status = 'completed' THEN CURRENT_TIMESTAMP
+          ELSE training_progress.completed_at
+        END,
+      updated_at = CURRENT_TIMESTAMP
+    RETURNING *
+    `,
+    [internId, moduleId, status, score, JSON.stringify(answers)]
+  );
+
+  return result.rows[0];
+};
+
+router.get("/courses", async (req, res) => {
+  try {
+    const user = await requireLogin(req, res);
+    if (!user) return;
+
+    if (!requireRoles(user, ["admin", "hr", "mentor"], res)) return;
+
+    const result = await pool.query(
+      `
+      SELECT id, title, description, created_at
+      FROM training_courses
+      ORDER BY created_at DESC, id DESC
+      `
+    );
 
     res.json({
-      assignments: result.rows,
+      courses: result.rows,
     });
   } catch (error) {
     res.status(500).json({
-      message: "Failed to load training assignments.",
+      message: "Failed to load training courses.",
       error: error.message,
     });
   }
 });
 
-router.get("/my-training", async (req, res) => {
+router.post("/courses", async (req, res) => {
   try {
-    const user = await getUserFromRequest(req);
+    const user = await requireLogin(req, res);
+    if (!user) return;
 
-    if (!user) {
-      return res.status(401).json({
-        message: "Please login first.",
+    if (!requireRoles(user, ["admin", "hr"], res)) return;
+
+    const { title, description } = req.body;
+
+    if (!title || !String(title).trim()) {
+      return res.status(400).json({
+        message: "Course title is required.",
+      });
+    }
+
+    const result = await pool.query(
+      `
+      INSERT INTO training_courses (title, description)
+      VALUES ($1, $2)
+      RETURNING *
+      `,
+      [String(title).trim(), description ? String(description).trim() : null]
+    );
+
+    res.status(201).json({
+      message: "Training course created successfully.",
+      course: result.rows[0],
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to create training course.",
+      error: error.message,
+    });
+  }
+});
+
+router.get("/modules", async (req, res) => {
+  try {
+    const user = await requireLogin(req, res);
+    if (!user) return;
+
+    if (!requireRoles(user, ["admin", "hr", "mentor"], res)) return;
+
+    const { courseId } = req.query;
+
+    const result = await pool.query(
+      `
+      SELECT
+        tm.id,
+        tm.course_id,
+        tc.title AS course_title,
+        tm.title,
+        tm.description,
+        tm.module_type,
+        tm.theory_content,
+        tm.content,
+        tm.video_url,
+        tm.module_order,
+        tm.estimated_minutes,
+        tm.passing_score,
+        tm.test_questions
+      FROM training_modules tm
+      JOIN training_courses tc ON tc.id = tm.course_id
+      WHERE ($1::INTEGER IS NULL OR tm.course_id = $1)
+      ORDER BY tm.course_id, COALESCE(tm.module_order, tm.id), tm.id
+      `,
+      [courseId ? Number(courseId) : null]
+    );
+
+    res.json({
+      modules: result.rows,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to load training modules.",
+      error: error.message,
+    });
+  }
+});
+
+router.post("/modules", async (req, res) => {
+  try {
+    const user = await requireLogin(req, res);
+    if (!user) return;
+
+    if (!requireRoles(user, ["admin", "hr"], res)) return;
+
+    const {
+      courseId,
+      title,
+      description,
+      moduleType,
+      theoryContent,
+      content,
+      videoUrl,
+      moduleOrder,
+      estimatedMinutes,
+      passingScore,
+      testQuestions,
+    } = req.body;
+
+    if (!courseId || !title || !moduleType) {
+      return res.status(400).json({
+        message: "Course, title, and module type are required.",
+      });
+    }
+
+    const cleanModuleType = String(moduleType).trim().toLowerCase();
+
+    if (!["theory", "video", "test"].includes(cleanModuleType)) {
+      return res.status(400).json({
+        message: "Module type must be theory, video, or test.",
+      });
+    }
+
+    let finalOrder = moduleOrder ? Number(moduleOrder) : null;
+
+    if (!finalOrder) {
+      const orderResult = await pool.query(
+        `
+        SELECT COALESCE(MAX(module_order), 0) + 1 AS next_order
+        FROM training_modules
+        WHERE course_id = $1
+        `,
+        [courseId]
+      );
+
+      finalOrder = Number(orderResult.rows[0]?.next_order || 1);
+    }
+
+    const result = await pool.query(
+      `
+      INSERT INTO training_modules
+      (
+        course_id,
+        title,
+        description,
+        module_type,
+        theory_content,
+        content,
+        video_url,
+        module_order,
+        estimated_minutes,
+        passing_score,
+        test_questions
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      RETURNING *
+      `,
+      [
+        Number(courseId),
+        String(title).trim(),
+        description ? String(description).trim() : null,
+        cleanModuleType,
+        theoryContent ? String(theoryContent).trim() : null,
+        content ? String(content).trim() : null,
+        videoUrl ? String(videoUrl).trim() : null,
+        finalOrder,
+        estimatedMinutes ? Number(estimatedMinutes) : 3,
+        passingScore ? Number(passingScore) : 70,
+        JSON.stringify(testQuestions || []),
+      ]
+    );
+
+    res.status(201).json({
+      message: "Training module created successfully.",
+      module: result.rows[0],
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to create training module.",
+      error: error.message,
+    });
+  }
+});
+
+router.post("/assignments", async (req, res) => {
+  try {
+    const user = await requireLogin(req, res);
+    if (!user) return;
+
+    if (!requireRoles(user, ["admin", "hr"], res)) return;
+
+    const { internId, courseId } = req.body;
+
+    if (!internId || !courseId) {
+      return res.status(400).json({
+        message: "Intern and course are required.",
+      });
+    }
+
+    const result = await pool.query(
+      `
+      INSERT INTO training_assignments (intern_id, course_id)
+      VALUES ($1, $2)
+      ON CONFLICT (intern_id, course_id)
+      DO UPDATE SET assigned_at = CURRENT_TIMESTAMP
+      RETURNING *
+      `,
+      [Number(internId), Number(courseId)]
+    );
+
+    res.status(201).json({
+      message: "Training assigned successfully.",
+      assignment: result.rows[0],
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to assign training.",
+      error: error.message,
+    });
+  }
+});
+
+router.post("/assign", async (req, res) => {
+  req.url = "/assignments";
+  router.handle(req, res);
+});
+
+router.get("/my", async (req, res) => {
+  try {
+    const user = await requireLogin(req, res);
+    if (!user) return;
+
+    if (user.role !== "intern") {
+      return res.status(403).json({
+        message: "Only interns can view assigned training.",
+      });
+    }
+
+    const intern = await getInternByUserEmail(user.email);
+
+    if (!intern) {
+      return res.status(404).json({
+        message: "Intern profile not found.",
+        courses: [],
       });
     }
 
@@ -136,115 +477,85 @@ router.get("/my-training", async (req, res) => {
       `
       SELECT
         ta.id AS assignment_id,
-        ta.status,
+        ta.course_id,
         ta.assigned_at,
-        tc.id AS course_id,
         tc.title AS course_title,
-        tc.description AS course_description,
-        d.name AS department_name,
-        COUNT(tm.id)::int AS total_modules,
-        COUNT(CASE WHEN tp.is_completed = true THEN 1 END)::int AS completed_modules,
-        CASE
-          WHEN COUNT(tm.id) = 0 THEN 0
-          ELSE ROUND(
-            (COUNT(CASE WHEN tp.is_completed = true THEN 1 END)::decimal / COUNT(tm.id)) * 100
-          )
-        END AS progress_percent
+        tc.description AS course_description
       FROM training_assignments ta
-      JOIN interns i ON i.id = ta.intern_id
       JOIN training_courses tc ON tc.id = ta.course_id
-      LEFT JOIN departments d ON d.id = tc.department_id
-      LEFT JOIN training_modules tm ON tm.course_id = tc.id
-      LEFT JOIN training_progress tp
-        ON tp.assignment_id = ta.id
-        AND tp.module_id = tm.id
-      WHERE LOWER(i.email) = LOWER($1)
-      GROUP BY ta.id, tc.id, d.name
-      ORDER BY ta.assigned_at DESC
+      WHERE ta.intern_id = $1
+      ORDER BY ta.assigned_at DESC, ta.id DESC
       `,
-      [user.email]
+      [intern.id]
     );
 
-    const assignments = [];
+    const courses = [];
 
     for (const assignment of assignmentsResult.rows) {
       const modulesResult = await pool.query(
         `
         SELECT
-          tm.id AS module_id,
+          tm.id,
+          tm.course_id,
           tm.title,
-          tm.content,
-          tm.module_order,
+          tm.description,
           tm.module_type,
+          tm.theory_content,
+          tm.content,
           tm.video_url,
+          tm.module_order,
+          tm.estimated_minutes,
           tm.passing_score,
-          COALESCE(tp.is_completed, false) AS is_completed,
+          tm.test_questions,
+          COALESCE(tp.status, 'not_started') AS progress_status,
+          COALESCE(tp.score, 0) AS score,
           tp.completed_at,
-          (
-            SELECT tta.score
-            FROM training_test_attempts tta
-            WHERE tta.assignment_id = $1
-            AND tta.module_id = tm.id
-            ORDER BY tta.attempted_at DESC
-            LIMIT 1
-          ) AS latest_score,
-          (
-            SELECT tta.passed
-            FROM training_test_attempts tta
-            WHERE tta.assignment_id = $1
-            AND tta.module_id = tm.id
-            ORDER BY tta.attempted_at DESC
-            LIMIT 1
-          ) AS latest_passed
+          tp.updated_at,
+          COALESCE(tp.attempt_count, 0) AS attempt_count
         FROM training_modules tm
         LEFT JOIN training_progress tp
           ON tp.module_id = tm.id
-          AND tp.assignment_id = $1
+          AND tp.intern_id = $1
         WHERE tm.course_id = $2
-        ORDER BY tm.module_order ASC, tm.id ASC
+        ORDER BY COALESCE(tm.module_order, tm.id), tm.id
         `,
-        [assignment.assignment_id, assignment.course_id]
+        [intern.id, assignment.course_id]
       );
 
-      const modules = [];
+      let canOpenCurrentModule = true;
 
-      for (const module of modulesResult.rows) {
-        let questions = [];
+      const modules = modulesResult.rows.map((module) => {
+        const isCompleted =
+          String(module.progress_status || "").toLowerCase() === "completed";
 
-        if (module.module_type === "test") {
-          const questionsResult = await pool.query(
-            `
-            SELECT
-              id,
-              question,
-              option_a,
-              option_b,
-              option_c,
-              option_d
-            FROM training_questions
-            WHERE module_id = $1
-            ORDER BY id ASC
-            `,
-            [module.module_id]
-          );
+        const isLocked = !canOpenCurrentModule;
 
-          questions = questionsResult.rows;
+        if (!isCompleted) {
+          canOpenCurrentModule = false;
         }
 
-        modules.push({
+        return {
           ...module,
-          questions,
-        });
-      }
+          test_questions: normalizeQuestions(module.test_questions),
+          is_completed: isCompleted,
+          is_locked: isLocked,
+          is_unlocked: !isLocked,
+        };
+      });
 
-      assignments.push({
-        ...assignment,
+      courses.push({
+        assignmentId: assignment.assignment_id,
+        courseId: assignment.course_id,
+        title: assignment.course_title,
+        description: assignment.course_description,
+        assignedAt: assignment.assigned_at,
         modules,
       });
     }
 
     res.json({
-      assignments,
+      intern,
+      courses,
     });
   } catch (error) {
     res.status(500).json({
@@ -254,173 +565,252 @@ router.get("/my-training", async (req, res) => {
   }
 });
 
-router.patch(
-  "/progress/:assignmentId/modules/:moduleId/complete",
-  async (req, res) => {
-    try {
-      const { assignmentId, moduleId } = req.params;
-
-      await pool.query(
-        `
-        INSERT INTO training_progress
-        (assignment_id, module_id, is_completed, completed_at)
-        VALUES ($1, $2, true, CURRENT_TIMESTAMP)
-        ON CONFLICT (assignment_id, module_id)
-        DO UPDATE SET
-          is_completed = true,
-          completed_at = CURRENT_TIMESTAMP
-        `,
-        [assignmentId, moduleId]
-      );
-
-      await updateAssignmentStatus(assignmentId);
-
-      res.json({
-        message: "Module marked as completed.",
-      });
-    } catch (error) {
-      res.status(500).json({
-        message: "Failed to update training progress.",
-        error: error.message,
-      });
-    }
-  }
-);
-
-router.post("/test/:assignmentId/modules/:moduleId/submit", async (req, res) => {
+router.post("/modules/:moduleId/complete", async (req, res) => {
   try {
-    const user = await getUserFromRequest(req);
+    const user = await requireLogin(req, res);
+    if (!user) return;
 
-    if (!user) {
-      return res.status(401).json({
-        message: "Please login first.",
+    if (user.role !== "intern") {
+      return res.status(403).json({
+        message: "Only interns can complete modules.",
       });
     }
 
-    const { assignmentId, moduleId } = req.params;
+    const intern = await getInternByUserEmail(user.email);
+
+    if (!intern) {
+      return res.status(404).json({
+        message: "Intern profile not found.",
+      });
+    }
+
+    const { moduleId } = req.params;
+    const { confirmStudied, confirmWatched, studySeconds } = req.body;
+
+    const module = await getModuleById(moduleId);
+
+    if (!module) {
+      return res.status(404).json({
+        message: "Training module not found.",
+      });
+    }
+
+    const moduleType = String(module.module_type || "").toLowerCase();
+
+    if (moduleType === "test") {
+      return res.status(400).json({
+        message: "Tests must be completed by submitting answers.",
+      });
+    }
+
+    const isAssigned = await checkInternAssignedToCourse(
+      intern.id,
+      module.course_id
+    );
+
+    if (!isAssigned) {
+      return res.status(403).json({
+        message: "This module is not assigned to you.",
+      });
+    }
+
+    const previousCompleted = await checkPreviousModulesCompleted(
+      intern.id,
+      module
+    );
+
+    if (!previousCompleted) {
+      return res.status(403).json({
+        message: "Complete previous modules before opening this module.",
+      });
+    }
+
+    if (moduleType === "theory") {
+      const estimatedMinutes = Number(module.estimated_minutes || 3);
+      const requiredSeconds = Math.min(Math.max(estimatedMinutes, 1) * 60, 300);
+      const cleanStudySeconds = Number(studySeconds || 0);
+
+      if (!confirmStudied) {
+        return res.status(400).json({
+          message: "Please confirm that you studied and understood the theory.",
+        });
+      }
+
+      if (cleanStudySeconds < requiredSeconds) {
+        return res.status(400).json({
+          message: `Study this theory for at least ${Math.ceil(
+            requiredSeconds / 60
+          )} minute(s) before completing it.`,
+        });
+      }
+    }
+
+    if (moduleType === "video" && !confirmWatched) {
+      return res.status(400).json({
+        message: "Please confirm that you watched the video module.",
+      });
+    }
+
+    const progress = await upsertProgress({
+      internId: intern.id,
+      moduleId: Number(moduleId),
+      status: "completed",
+      score: 100,
+      answers: {
+        completedBy: user.email,
+        moduleType,
+      },
+    });
+
+    res.json({
+      message: "Module completed successfully. Next module is now unlocked.",
+      progress,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to complete module.",
+      error: error.message,
+    });
+  }
+});
+
+router.post("/modules/:moduleId/test-submit", async (req, res) => {
+  try {
+    const user = await requireLogin(req, res);
+    if (!user) return;
+
+    if (user.role !== "intern") {
+      return res.status(403).json({
+        message: "Only interns can submit tests.",
+      });
+    }
+
+    const intern = await getInternByUserEmail(user.email);
+
+    if (!intern) {
+      return res.status(404).json({
+        message: "Intern profile not found.",
+      });
+    }
+
+    const { moduleId } = req.params;
     const { answers } = req.body;
 
-    const assignmentResult = await pool.query(
-      `
-      SELECT
-        ta.id AS assignment_id,
-        ta.intern_id,
-        tm.id AS module_id,
-        tm.passing_score
-      FROM training_assignments ta
-      JOIN training_modules tm ON tm.course_id = ta.course_id
-      JOIN interns i ON i.id = ta.intern_id
-      WHERE ta.id = $1
-      AND tm.id = $2
-      AND tm.module_type = 'test'
-      AND LOWER(i.email) = LOWER($3)
-      LIMIT 1
-      `,
-      [assignmentId, moduleId, user.email]
-    );
+    const module = await getModuleById(moduleId);
 
-    if (assignmentResult.rows.length === 0) {
+    if (!module) {
       return res.status(404).json({
-        message: "Test module not found.",
+        message: "Training module not found.",
       });
     }
 
-    const assignment = assignmentResult.rows[0];
+    const moduleType = String(module.module_type || "").toLowerCase();
 
-    const questionsResult = await pool.query(
-      `
-      SELECT id, correct_option
-      FROM training_questions
-      WHERE module_id = $1
-      ORDER BY id ASC
-      `,
-      [moduleId]
+    if (moduleType !== "test") {
+      return res.status(400).json({
+        message: "This module is not a test.",
+      });
+    }
+
+    const isAssigned = await checkInternAssignedToCourse(
+      intern.id,
+      module.course_id
     );
 
-    const questions = questionsResult.rows;
+    if (!isAssigned) {
+      return res.status(403).json({
+        message: "This test is not assigned to you.",
+      });
+    }
+
+    const previousCompleted = await checkPreviousModulesCompleted(
+      intern.id,
+      module
+    );
+
+    if (!previousCompleted) {
+      return res.status(403).json({
+        message: "Complete previous modules before taking this test.",
+      });
+    }
+
+    const questions = normalizeQuestions(module.test_questions);
 
     if (questions.length === 0) {
-      return res.status(400).json({
-        message: "No questions found for this test.",
+      const progress = await upsertProgress({
+        internId: intern.id,
+        moduleId: Number(moduleId),
+        status: "completed",
+        score: 100,
+        answers: {},
+      });
+
+      return res.json({
+        message: "Test completed successfully.",
+        passed: true,
+        score: 100,
+        correctCount: 0,
+        totalQuestions: 0,
+        progress,
       });
     }
 
-    let correctAnswers = 0;
+    let correctCount = 0;
+    const cleanAnswers = answers || {};
 
-    questions.forEach((question) => {
-      const selectedAnswer = String(answers?.[question.id] || "").toUpperCase();
+    questions.forEach((question, index) => {
+      const userAnswer = cleanAnswers[index];
+      const userAnswerNumber = Number(userAnswer);
 
-      if (selectedAnswer === question.correct_option) {
-        correctAnswers += 1;
+      let isCorrect = false;
+
+      if (
+        question.correctIndex !== undefined &&
+        Number(question.correctIndex) === userAnswerNumber
+      ) {
+        isCorrect = true;
+      }
+
+      if (question.correctAnswer !== undefined) {
+        const correctAnswer = String(question.correctAnswer).trim().toLowerCase();
+
+        const selectedOption =
+          Array.isArray(question.options) && question.options[userAnswerNumber]
+            ? String(question.options[userAnswerNumber]).trim().toLowerCase()
+            : String(userAnswer || "").trim().toLowerCase();
+
+        if (selectedOption === correctAnswer) {
+          isCorrect = true;
+        }
+      }
+
+      if (isCorrect) {
+        correctCount += 1;
       }
     });
 
-    const totalQuestions = questions.length;
-    const score = Math.round((correctAnswers / totalQuestions) * 100);
-    const passed = score >= Number(assignment.passing_score || 60);
+    const score = Math.round((correctCount / questions.length) * 100);
+    const passingScore = Number(module.passing_score || 70);
+    const passed = score >= passingScore;
 
-    await pool.query(
-      `
-      INSERT INTO training_test_attempts
-      (
-        assignment_id,
-        module_id,
-        intern_id,
-        score,
-        total_questions,
-        correct_answers,
-        passed
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
-      `,
-      [
-        assignmentId,
-        moduleId,
-        assignment.intern_id,
-        score,
-        totalQuestions,
-        correctAnswers,
-        passed,
-      ]
-    );
-
-    if (passed) {
-      await pool.query(
-        `
-        INSERT INTO training_progress
-        (assignment_id, module_id, is_completed, completed_at)
-        VALUES ($1, $2, true, CURRENT_TIMESTAMP)
-        ON CONFLICT (assignment_id, module_id)
-        DO UPDATE SET
-          is_completed = true,
-          completed_at = CURRENT_TIMESTAMP
-        `,
-        [assignmentId, moduleId]
-      );
-    } else {
-      await pool.query(
-        `
-        INSERT INTO training_progress
-        (assignment_id, module_id, is_completed)
-        VALUES ($1, $2, false)
-        ON CONFLICT (assignment_id, module_id)
-        DO UPDATE SET
-          is_completed = false
-        `,
-        [assignmentId, moduleId]
-      );
-    }
-
-    await updateAssignmentStatus(assignmentId);
+    const progress = await upsertProgress({
+      internId: intern.id,
+      moduleId: Number(moduleId),
+      status: passed ? "completed" : "failed",
+      score,
+      answers: cleanAnswers,
+    });
 
     res.json({
       message: passed
-        ? "Test passed. Module completed."
-        : "Test submitted, but passing score not reached. Try again.",
-      score,
-      totalQuestions,
-      correctAnswers,
+        ? "Test passed. Next module is now unlocked."
+        : `Test failed. You need at least ${passingScore}% to pass.`,
       passed,
+      score,
+      passingScore,
+      correctCount,
+      totalQuestions: questions.length,
+      progress,
     });
   } catch (error) {
     res.status(500).json({

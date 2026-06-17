@@ -4092,3 +4092,390 @@ tbody tr:hover {
     width: 100%;
   }
 }
+/* STEP 6: THEORY MODULES + SEQUENTIAL TRAINING UI */
+
+.ws-learning-layout {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: 22px;
+  margin-top: 22px;
+}
+
+.ws-learning-sidebar,
+.ws-learning-content {
+  background: #0b0b0b;
+  border: 1px solid rgba(255, 122, 0, 0.18);
+  border-radius: 22px;
+  padding: 22px;
+}
+
+.ws-learning-intern {
+  display: grid;
+  gap: 4px;
+  padding: 16px;
+  background: rgba(255, 122, 0, 0.08);
+  border: 1px solid rgba(255, 122, 0, 0.22);
+  border-radius: 16px;
+  margin-bottom: 18px;
+}
+
+.ws-learning-intern strong {
+  color: #ffffff;
+  font-size: 18px;
+}
+
+.ws-learning-intern span {
+  color: #bdbdbd;
+  font-size: 14px;
+}
+
+.ws-course-select {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.ws-module-list {
+  display: grid;
+  gap: 12px;
+}
+
+.ws-module-item {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  gap: 12px;
+  text-align: left;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #101010;
+  cursor: pointer;
+}
+
+.ws-module-item:hover {
+  border-color: rgba(255, 122, 0, 0.45);
+}
+
+.ws-module-item.active {
+  border-color: #ff7a00;
+  background: rgba(255, 122, 0, 0.09);
+}
+
+.ws-module-item.locked {
+  opacity: 0.56;
+  cursor: not-allowed;
+}
+
+.ws-module-number {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: #ff7a00;
+  color: #000000;
+  display: grid;
+  place-items: center;
+  font-weight: 1000;
+}
+
+.ws-module-info {
+  display: grid;
+  gap: 4px;
+}
+
+.ws-module-info strong {
+  color: #ffffff;
+  font-size: 15px;
+}
+
+.ws-module-info small {
+  color: #a9a9a9;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.ws-module-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 22px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.ws-module-type {
+  display: inline-flex;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(255, 122, 0, 0.12);
+  color: #ff7a00;
+  font-size: 12px;
+  font-weight: 1000;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+
+.ws-module-header h3 {
+  color: #ffffff;
+  font-size: 30px;
+  margin-bottom: 8px;
+}
+
+.ws-module-header p {
+  color: #c9c9c9;
+}
+
+.ws-module-status {
+  padding: 7px 13px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 1000;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.ws-module-status.completed {
+  background: rgba(34, 197, 94, 0.12);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.32);
+}
+
+.ws-module-status.unlocked {
+  background: rgba(255, 122, 0, 0.12);
+  color: #ff7a00;
+  border: 1px solid rgba(255, 122, 0, 0.3);
+}
+
+.ws-module-status.locked,
+.ws-module-status.failed {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ff6b6b;
+  border: 1px solid rgba(239, 68, 68, 0.28);
+}
+
+.ws-study-progress,
+.ws-test-progress {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  background: #101010;
+  border: 1px solid rgba(255, 122, 0, 0.16);
+  border-radius: 16px;
+  margin-bottom: 18px;
+}
+
+.ws-study-progress > div:first-child,
+.ws-test-progress > div:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.ws-study-progress strong,
+.ws-test-progress strong {
+  color: #ffffff;
+}
+
+.ws-study-progress span,
+.ws-test-progress span {
+  color: #ff7a00;
+  font-weight: 900;
+}
+
+.ws-progress-track {
+  width: 100%;
+  height: 12px;
+  border-radius: 999px;
+  background: #1e1e1e;
+  overflow: hidden;
+}
+
+.ws-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: #ff7a00;
+  transition: width 0.25s ease;
+}
+
+.ws-theory-content {
+  max-height: 420px;
+  overflow-y: auto;
+  padding: 22px;
+  background: #101010;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  margin-bottom: 18px;
+}
+
+.ws-theory-content p {
+  color: #e5e5e5;
+  line-height: 1.8;
+  margin-bottom: 14px;
+}
+
+.ws-confirm-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  color: #ffffff;
+  font-weight: 800;
+  margin: 18px 0;
+}
+
+.ws-confirm-check input {
+  width: 18px;
+  height: 18px;
+  margin-top: 4px;
+  accent-color: #ff7a00;
+}
+
+.ws-video-link {
+  display: inline-flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 20px;
+  border-radius: 14px;
+  background: #ff7a00;
+  color: #000000;
+  font-weight: 1000;
+  text-decoration: none;
+  margin-bottom: 18px;
+}
+
+.ws-question-card {
+  padding: 22px;
+  background: #101010;
+  border: 1px solid rgba(255, 122, 0, 0.16);
+  border-radius: 20px;
+  margin-bottom: 20px;
+}
+
+.ws-question-top {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.ws-question-top span {
+  color: #ff7a00;
+  font-size: 13px;
+  font-weight: 1000;
+  text-transform: uppercase;
+}
+
+.ws-question-top strong {
+  color: #ffffff;
+  font-size: 20px;
+}
+
+.ws-option-list {
+  display: grid;
+  gap: 12px;
+}
+
+.ws-option-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 64px;
+  padding: 16px;
+  background: #0b0b0b;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  color: #ffffff;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.ws-option-card:hover {
+  border-color: rgba(255, 122, 0, 0.5);
+  background: rgba(255, 122, 0, 0.06);
+}
+
+.ws-option-card.selected {
+  border-color: #ff7a00;
+  background: rgba(255, 122, 0, 0.12);
+}
+
+.ws-option-card input {
+  width: 18px;
+  height: 18px;
+  accent-color: #ff7a00;
+}
+
+.ws-test-result {
+  padding: 18px;
+  border-radius: 18px;
+  margin: 18px 0;
+}
+
+.ws-test-result.passed {
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.32);
+}
+
+.ws-test-result.failed {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.32);
+}
+
+.ws-test-result h3 {
+  color: #ffffff;
+  margin-bottom: 8px;
+}
+
+.ws-test-result p {
+  color: #c9c9c9;
+}
+
+.ws-locked-module {
+  text-align: center;
+  padding: 42px;
+  border: 1px dashed rgba(255, 122, 0, 0.3);
+  border-radius: 22px;
+  background: rgba(255, 122, 0, 0.05);
+}
+
+.ws-locked-module h3 {
+  color: #ffffff;
+  margin-bottom: 8px;
+}
+
+.ws-locked-module p {
+  color: #c9c9c9;
+}
+
+@media (max-width: 1000px) {
+  .ws-learning-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 650px) {
+  .ws-learning-sidebar,
+  .ws-learning-content {
+    padding: 16px;
+  }
+
+  .ws-module-header {
+    flex-direction: column;
+  }
+
+  .ws-study-progress > div:first-child,
+  .ws-test-progress > div:first-child {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .ws-theory-content {
+    max-height: 360px;
+    padding: 16px;
+  }
+
+  .ws-question-card {
+    padding: 16px;
+  }
+}
