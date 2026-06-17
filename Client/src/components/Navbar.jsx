@@ -1,10 +1,9 @@
 // Client/src/components/Navbar.jsx
 
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 
 function Navbar({ user, onLogout, logout }) {
   const location = useLocation();
-  const navigate = useNavigate();
 
   const activeUser = user || null;
 
@@ -29,9 +28,11 @@ function Navbar({ user, onLogout, logout }) {
   };
 
   const handleLogoutClick = () => {
-    localStorage.setItem("worksync_manual_logout", "true");
     localStorage.removeItem("worksync_user");
     localStorage.removeItem("worksync_token");
+    localStorage.removeItem("worksync_manual_logout");
+
+    window.dispatchEvent(new Event("worksync-auth-cleared"));
 
     if (typeof onLogout === "function") {
       onLogout();
@@ -43,14 +44,17 @@ function Navbar({ user, onLogout, logout }) {
       return;
     }
 
-    navigate("/login", { replace: true });
+    window.location.replace("/login");
   };
 
-  const hideUserLinks =
-    location.pathname === "/login" ||
-    location.pathname === "/register" ||
-    location.pathname === "/session-expired" ||
-    location.pathname === "/unauthorized";
+  const publicPages = [
+    "/login",
+    "/register",
+    "/session-expired",
+    "/unauthorized",
+  ];
+
+  const isPublicPage = publicPages.includes(location.pathname);
 
   return (
     <nav className="navbar">
@@ -64,14 +68,14 @@ function Navbar({ user, onLogout, logout }) {
       <div className="nav-links">
         <Link to="/">Home</Link>
 
-        {!activeUser && !hideUserLinks && (
+        {!activeUser && (
           <>
             <Link to="/login">Login</Link>
-            <Link to="/register">Register</Link>
+            {!isPublicPage && <Link to="/register">Register</Link>}
           </>
         )}
 
-        {activeUser && !hideUserLinks && (
+        {activeUser && !isPublicPage && (
           <>
             <Link to={getDashboardPath()}>{getDashboardLabel()}</Link>
 
@@ -82,12 +86,6 @@ function Navbar({ user, onLogout, logout }) {
             >
               Logout
             </button>
-          </>
-        )}
-
-        {hideUserLinks && (
-          <>
-            <Link to="/login">Login</Link>
           </>
         )}
       </div>

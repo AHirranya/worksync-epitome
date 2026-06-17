@@ -28,7 +28,6 @@ api.interceptors.response.use(
   (error) => {
     const status = error.response?.status;
     const requestUrl = String(error.config?.url || "");
-    const manualLogout = localStorage.getItem("worksync_manual_logout") === "true";
 
     const isAuthRequest =
       requestUrl.includes("/auth/login") ||
@@ -36,17 +35,15 @@ api.interceptors.response.use(
       requestUrl.includes("/auth/logout") ||
       requestUrl.includes("/auth/me");
 
-    if (status === 401 && !isAuthRequest && !manualLogout) {
+    if (status === 401 && !isAuthRequest) {
       localStorage.removeItem("worksync_user");
       localStorage.removeItem("worksync_token");
+      localStorage.removeItem("worksync_manual_logout");
 
       window.dispatchEvent(new Event("worksync-auth-cleared"));
 
-      if (
-        window.location.pathname !== "/login" &&
-        window.location.pathname !== "/session-expired"
-      ) {
-        window.location.href = "/session-expired";
+      if (window.location.pathname !== "/login") {
+        window.location.replace("/login");
       }
     }
 

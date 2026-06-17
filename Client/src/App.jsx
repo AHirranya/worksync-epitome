@@ -32,6 +32,7 @@ function safeParseUser() {
   } catch (error) {
     localStorage.removeItem("worksync_user");
     localStorage.removeItem("worksync_token");
+    localStorage.removeItem("worksync_manual_logout");
     return null;
   }
 }
@@ -55,6 +56,8 @@ function App() {
   const clearSession = () => {
     localStorage.removeItem("worksync_user");
     localStorage.removeItem("worksync_token");
+    localStorage.removeItem("worksync_manual_logout");
+
     setUser(null);
     window.dispatchEvent(new Event("worksync-auth-cleared"));
   };
@@ -62,13 +65,6 @@ function App() {
   const loadLoggedInUser = async () => {
     try {
       const token = localStorage.getItem("worksync_token");
-      const manualLogout = localStorage.getItem("worksync_manual_logout") === "true";
-
-      if (manualLogout) {
-        clearSession();
-        setLoading(false);
-        return;
-      }
 
       if (!token || token === "undefined" || token === "null") {
         clearSession();
@@ -80,7 +76,6 @@ function App() {
       const loggedInUser = res.data.user;
 
       if (loggedInUser) {
-        localStorage.removeItem("worksync_manual_logout");
         localStorage.setItem("worksync_user", JSON.stringify(loggedInUser));
         setUser(loggedInUser);
       } else {
@@ -94,13 +89,7 @@ function App() {
   };
 
   const handleLogout = () => {
-    localStorage.setItem("worksync_manual_logout", "true");
-    localStorage.removeItem("worksync_user");
-    localStorage.removeItem("worksync_token");
-
-    setUser(null);
-    window.dispatchEvent(new Event("worksync-auth-cleared"));
-
+    clearSession();
     window.location.replace("/login");
   };
 
@@ -131,14 +120,14 @@ function App() {
     };
   }, []);
 
-  const hideUserNavbarPages = [
+  const publicPages = [
     "/login",
     "/register",
     "/session-expired",
     "/unauthorized",
   ];
 
-  const navbarUser = hideUserNavbarPages.includes(location.pathname) ? null : user;
+  const navbarUser = publicPages.includes(location.pathname) ? null : user;
 
   return (
     <>
@@ -220,6 +209,7 @@ function App() {
         />
 
         <Route path="/unauthorized" element={<UnauthorizedPage />} />
+
         <Route path="/session-expired" element={<SessionExpiredPage />} />
 
         <Route path="*" element={<NotFoundPage />} />

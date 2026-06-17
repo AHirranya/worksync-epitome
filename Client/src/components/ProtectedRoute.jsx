@@ -14,6 +14,7 @@ function safeParseUser() {
   } catch (error) {
     localStorage.removeItem("worksync_user");
     localStorage.removeItem("worksync_token");
+    localStorage.removeItem("worksync_manual_logout");
     return null;
   }
 }
@@ -21,7 +22,6 @@ function safeParseUser() {
 function ProtectedRoute({ user, loading, allowedRoles, children }) {
   const storedUser = safeParseUser();
   const token = localStorage.getItem("worksync_token");
-  const manualLogout = localStorage.getItem("worksync_manual_logout") === "true";
 
   const activeUser = user || storedUser;
 
@@ -40,11 +40,7 @@ function ProtectedRoute({ user, loading, allowedRoles, children }) {
   }
 
   if (!token || token === "undefined" || token === "null" || !activeUser) {
-    if (manualLogout) {
-      return <Navigate to="/login" replace />;
-    }
-
-    return <Navigate to="/session-expired" replace />;
+    return <Navigate to="/login" replace />;
   }
 
   const userRole = String(activeUser.role || "").toLowerCase();
