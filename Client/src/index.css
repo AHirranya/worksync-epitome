@@ -4995,3 +4995,326 @@ tbody tr:hover {
     padding: 16px;
   }
 }
+/* STEP 8: CERTIFICATE PDF + NAME FIX */
+
+.ws8-eligibility-card {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  margin: 22px 0;
+}
+
+.ws8-eligibility-card > div,
+.ws8-certificate-details,
+.ws8-state-card,
+.ws8-hr-cert-card {
+  background: #0b0b0b;
+  border: 1px solid rgba(255, 122, 0, 0.18);
+  border-radius: 22px;
+  padding: 22px;
+}
+
+.ws8-eligibility-card span,
+.ws8-hr-cert-metrics span {
+  display: block;
+  color: #a8a8a8;
+  font-size: 13px;
+  font-weight: 900;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.ws8-eligibility-card strong,
+.ws8-hr-cert-metrics strong {
+  color: #ff7a00;
+  font-size: 34px;
+  font-weight: 1000;
+}
+
+.ws8-eligibility-card p {
+  color: #cfcfcf;
+  margin-top: 8px;
+}
+
+.ws8-state-card {
+  text-align: center;
+  margin: 20px 0;
+}
+
+.ws8-state-card h3 {
+  color: #ffffff;
+  margin-bottom: 8px;
+}
+
+.ws8-state-card p {
+  color: #cfcfcf;
+}
+
+.ws8-certificate {
+  background: #ffffff;
+  color: #111111;
+  border: 10px solid #ff7a00;
+  border-radius: 20px;
+  padding: 18px;
+  margin: 24px 0;
+}
+
+.ws8-cert-border {
+  border: 2px solid #111111;
+  min-height: 620px;
+  padding: 42px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.ws8-cert-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.ws8-cert-logo {
+  width: 68px;
+  height: 68px;
+  border-radius: 18px;
+  background: #ff7a00;
+  color: #000000;
+  display: grid;
+  place-items: center;
+  font-weight: 1000;
+  font-size: 24px;
+}
+
+.ws8-cert-header h2 {
+  color: #111111;
+  font-size: 34px;
+  margin: 0;
+}
+
+.ws8-cert-header p {
+  color: #555555;
+  margin: 3px 0 0;
+}
+
+.ws8-cert-body {
+  text-align: center;
+  padding: 36px 0;
+}
+
+.ws8-cert-small {
+  color: #666666;
+  font-size: 20px;
+  margin-bottom: 16px;
+}
+
+.ws8-cert-body h1 {
+  color: #000000;
+  font-size: 52px;
+  line-height: 1.1;
+  margin: 18px 0;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.ws8-cert-body h3 {
+  color: #ff7a00;
+  font-size: 34px;
+  margin: 14px 0;
+}
+
+.ws8-cert-text {
+  color: #333333;
+  font-size: 20px;
+  line-height: 1.7;
+  max-width: 850px;
+  margin: 0 auto 28px;
+}
+
+.ws8-cert-meta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 30px;
+}
+
+.ws8-cert-meta > div {
+  border: 1px solid #dddddd;
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.ws8-cert-meta span {
+  display: block;
+  color: #777777;
+  font-size: 12px;
+  text-transform: uppercase;
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+
+.ws8-cert-meta strong {
+  color: #111111;
+  font-size: 14px;
+  word-break: break-word;
+}
+
+.ws8-cert-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 80px;
+  margin-top: 32px;
+}
+
+.ws8-cert-footer div {
+  flex: 1;
+  text-align: center;
+}
+
+.ws8-cert-footer span {
+  display: block;
+  height: 2px;
+  background: #111111;
+  margin-bottom: 10px;
+}
+
+.ws8-cert-footer p {
+  color: #111111;
+  font-weight: 800;
+}
+
+.ws8-certificate-details {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.ws8-certificate-details p {
+  color: #ffffff;
+}
+
+.ws8-certificate-details strong {
+  color: #ff7a00;
+}
+
+.ws8-hr-certificate-list {
+  display: grid;
+  gap: 18px;
+  margin-top: 22px;
+}
+
+.ws8-hr-cert-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.ws8-hr-cert-top h3 {
+  color: #ffffff;
+  margin-bottom: 6px;
+}
+
+.ws8-hr-cert-top p {
+  color: #cfcfcf;
+}
+
+.ws8-hr-cert-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.ws8-hr-cert-metrics > div {
+  background: #101010;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 16px;
+}
+
+.ws8-cert-mini-details {
+  background: rgba(255, 122, 0, 0.07);
+  border: 1px solid rgba(255, 122, 0, 0.24);
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.ws8-cert-mini-details p {
+  color: #ffffff;
+  margin-bottom: 6px;
+}
+
+.ws8-cert-mini-details strong {
+  color: #ff7a00;
+}
+
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+
+  .ws8-print-area,
+  .ws8-print-area * {
+    visibility: visible !important;
+  }
+
+  .ws8-print-area {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    background: #ffffff;
+  }
+
+  .ws8-certificate {
+    margin: 0;
+    border-radius: 0;
+    border: 10px solid #ff7a00;
+    box-shadow: none;
+  }
+
+  .ws8-cert-border {
+    min-height: 95vh;
+  }
+}
+
+@media (max-width: 900px) {
+  .ws8-eligibility-card,
+  .ws8-cert-meta,
+  .ws8-hr-cert-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .ws8-cert-body h1 {
+    font-size: 36px;
+  }
+
+  .ws8-cert-body h3 {
+    font-size: 26px;
+  }
+
+  .ws8-cert-text {
+    font-size: 17px;
+  }
+
+  .ws8-cert-footer {
+    gap: 24px;
+  }
+}
+
+@media (max-width: 600px) {
+  .ws8-cert-border {
+    padding: 24px;
+  }
+
+  .ws8-cert-header {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .ws8-cert-footer {
+    flex-direction: column;
+  }
+}

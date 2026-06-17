@@ -6,18 +6,25 @@ const pool = require("../config/db");
 
 const router = express.Router();
 
-const JWT_SECRET = process.env.JWT_SECRET || "worksync_secret_key";
+const JWT_SECRET = process.env.JWT_SECRET || "worksync_secret_key_change_this";
+
+const getTokenFromRequest = (req) => {
+  const cookieToken = req.cookies?.token;
+
+  const authHeader = req.headers.authorization;
+  const bearerToken =
+    authHeader && authHeader.startsWith("Bearer ")
+      ? authHeader.replace("Bearer ", "")
+      : null;
+
+  return cookieToken || bearerToken || null;
+};
 
 const getUserFromRequest = async (req) => {
   try {
-    const token =
-      req.cookies?.token ||
-      req.headers.authorization?.replace("Bearer ", "") ||
-      null;
+    const token = getTokenFromRequest(req);
 
-    if (!token) {
-      return null;
-    }
+    if (!token) return null;
 
     const decoded = jwt.verify(token, JWT_SECRET);
 
@@ -37,74 +44,132 @@ const getUserFromRequest = async (req) => {
   }
 };
 
-const calculateEligibility = async (internId) => {
-  const trainingResult = await pool.query(
+const requireLogin = async (req, res) => {
+  const user = await getUserFromRequest(req);
+
+  if (!user) {
+    res.status(401).json({
+      message: "Please login first.",
+    });
+
+    return null;
+  }
+
+  return user;
+};
+
+const getInternByEmail = async (email) => {
+  const result = await pool.query(
     `
     SELECT
-      COUNT(tm.id)::int AS total_required_modules,
-      COUNT(
-        CASE
-          WHEN tp.is_completed = true THEN 1
-        END
-      )::int AS completed_required_modules
-    FROM training_assignments ta
-    JOIN training_modules tm ON tm.course_id = ta.course_id
-    LEFT JOIN training_progress tp
-      ON tp.assignment_id = ta.id
-      AND tp.module_id = tm.id
-    WHERE ta.intern_id = $1
-    AND LOWER(tm.module_type) IN ('theory', 'video')
+      i.id,
+      i.full_name,
+      i.email,
+      i.department_id,
+      i.status,
+      d.name AS department_name
+    FROM interns i
+    LEFT JOIN departments d ON d.id = i.department_id
+    WHERE LOWER(i.email) = LOWER($1)
+    LIMIT 1
+    `,
+    [email]
+  );
+
+  return result.rows[0] || null;
+};
+
+const getInternById = async (internId) => {
+  const result = await pool.query(
+    `
+    SELECT
+      i.id,
+      i.full_name,
+      i.email,
+      i.department_id,
+      i.status,
+      d.name AS department_name
+    FROM interns i
+    LEFT JOIN departments d ON d.id = i.department_id
+    WHERE i.id = $1
+    LIMIT 1
     `,
     [internId]
   );
 
-  const row = trainingResult.rows[0];
+  return result.rows[0] || null;
+};
 
-  const totalRequiredModules = Number(row.total_required_modules || 0);
-  const completedRequiredModules = Number(row.completed_required_modules || 0);
+const createCertificateNumber = () => {
+  const year = new Date().getFullYear();
+  const randomNumber = Math.floor(100000 + Math.random() * 900000);
+
+  return `WS-CERT-${year}-${randomNumber}`;
+};
+
+const createVerificationCode = () => {
+  const partOne = Math.random().toString(36).substring(2, 8).toUpperCase();
+  const partTwo = Math.random().toString(36).substring(2, 8).toUpperCase();
+  const partThree = Math.random().toString(36).substring(2, 8).toUpperCase();
+
+  return `VERIFY-${partOne}-${partTwo}-${partThree}`;
+};
+
+const calculateTrainingEligibility = async (internId) => {
+  const result = await pool.query(
+    `
+    SELECT
+      COUNT(tm.id) AS total_modules,
+      COUNT(
+        CASE
+          WHEN LOWER(COALESCE(tp.status, '')) = 'completed' THEN 1
+        END
+      ) AS completed_modules
+    FROM training_assignments ta
+    JOIN training_modules tm ON tm.course_id = ta.course_id
+    LEFT JOIN training_progress tp
+      ON tp.module_id = tm.id
+      AND tp.intern_id = ta.intern_id
+    WHERE ta.intern_id = $1
+    AND LOWER(COALESCE(tm.module_type, '')) IN ('theory', 'video')
+    `,
+    [internId]
+  );
+
+  const totalModules = Number(result.rows[0]?.total_modules || 0);
+  const completedModules = Number(result.rows[0]?.completed_modules || 0);
 
   const trainingPercent =
-    totalRequiredModules === 0
-      ? 0
-      : Math.round((completedRequiredModules / totalRequiredModules) * 100);
-
-  const eligible = totalRequiredModules > 0 && trainingPercent >= 75;
-
-  const missingRequirements = [];
-
-  if (totalRequiredModules === 0) {
-    missingRequirements.push("No theory/video training modules assigned yet.");
-  }
-
-  if (trainingPercent < 75) {
-    missingRequirements.push(
-      "Complete at least 75% of theory and video training modules."
-    );
-  }
+    totalModules > 0 ? Math.round((completedModules / totalModules) * 100) : 0;
 
   return {
-    eligible,
-    missingRequirements,
-    totalRequiredModules,
-    completedRequiredModules,
+    totalModules,
+    completedModules,
     trainingPercent,
+    eligible: totalModules > 0 && trainingPercent >= 75,
     requiredPercent: 75,
   };
 };
 
-const getCertificateForIntern = async (internId) => {
+const getCertificateByInternId = async (internId) => {
   const result = await pool.query(
     `
     SELECT
       c.id,
+      c.intern_id,
       c.certificate_number,
       c.verification_code,
       c.title,
       c.status,
       c.issued_at,
-      u.full_name AS issued_by_name
+      c.created_at,
+      c.updated_at,
+      i.full_name AS intern_name,
+      i.email AS intern_email,
+      d.name AS department_name
     FROM certificates c
-    LEFT JOIN users u ON u.id = c.issued_by
+    JOIN interns i ON i.id = c.intern_id
+    LEFT JOIN departments d ON d.id = i.department_id
     WHERE c.intern_id = $1
     LIMIT 1
     `,
@@ -114,29 +179,58 @@ const getCertificateForIntern = async (internId) => {
   return result.rows[0] || null;
 };
 
-const generateCertificateNumber = (internId) => {
-  const year = new Date().getFullYear();
-  const random = Math.floor(100000 + Math.random() * 900000);
+const getCertificateResponse = async (intern) => {
+  const eligibility = await calculateTrainingEligibility(intern.id);
+  const certificate = await getCertificateByInternId(intern.id);
 
-  return `WS-CERT-${year}-${internId}-${random}`;
+  return {
+    intern: {
+      id: intern.id,
+      full_name: intern.full_name,
+      intern_name: intern.full_name,
+      email: intern.email,
+      department_name: intern.department_name,
+      status: intern.status,
+    },
+    eligibility,
+    certificate,
+  };
 };
 
-const generateVerificationCode = () => {
-  const random = Math.random().toString(36).substring(2, 10).toUpperCase();
-  const timestamp = Date.now().toString(36).toUpperCase();
+router.get("/my", async (req, res) => {
+  try {
+    const user = await requireLogin(req, res);
+    if (!user) return;
 
-  return `VERIFY-${random}-${timestamp}`;
-};
+    if (user.role !== "intern") {
+      return res.status(403).json({
+        message: "Only interns can view their certificate.",
+      });
+    }
+
+    const intern = await getInternByEmail(user.email);
+
+    if (!intern) {
+      return res.status(404).json({
+        message: "Intern profile not found.",
+      });
+    }
+
+    const response = await getCertificateResponse(intern);
+
+    res.json(response);
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to load certificate.",
+      error: error.message,
+    });
+  }
+});
 
 router.get("/hr", async (req, res) => {
   try {
-    const user = await getUserFromRequest(req);
-
-    if (!user) {
-      return res.status(401).json({
-        message: "Please login first.",
-      });
-    }
+    const user = await requireLogin(req, res);
+    if (!user) return;
 
     if (!["hr", "admin", "mentor"].includes(user.role)) {
       return res.status(403).json({
@@ -144,170 +238,126 @@ router.get("/hr", async (req, res) => {
       });
     }
 
-    const internsResult = await pool.query(`
+    const internsResult = await pool.query(
+      `
       SELECT
         i.id,
-        i.intern_id,
         i.full_name,
         i.email,
         i.status,
         d.name AS department_name
       FROM interns i
       LEFT JOIN departments d ON d.id = i.department_id
-      ORDER BY i.created_at DESC
-    `);
+      ORDER BY i.created_at DESC, i.id DESC
+      `
+    );
 
-    const certificates = [];
+    const interns = [];
 
     for (const intern of internsResult.rows) {
-      const eligibility = await calculateEligibility(intern.id);
-      const certificate = await getCertificateForIntern(intern.id);
+      const eligibility = await calculateTrainingEligibility(intern.id);
+      const certificate = await getCertificateByInternId(intern.id);
 
-      certificates.push({
+      interns.push({
         ...intern,
+        intern_name: intern.full_name,
         eligibility,
         certificate,
       });
     }
 
     res.json({
-      certificates,
+      interns,
     });
   } catch (error) {
     res.status(500).json({
-      message: "Failed to load certificate data.",
+      message: "Failed to load certificate records.",
       error: error.message,
     });
   }
 });
 
-router.get("/my", async (req, res) => {
+const generateCertificate = async (req, res) => {
   try {
-    const user = await getUserFromRequest(req);
+    const user = await requireLogin(req, res);
+    if (!user) return;
 
-    if (!user) {
-      return res.status(401).json({
-        message: "Please login first.",
-      });
-    }
-
-    const internResult = await pool.query(
-      `
-      SELECT
-        i.id,
-        i.intern_id,
-        i.full_name,
-        i.email,
-        i.status,
-        d.name AS department_name
-      FROM interns i
-      LEFT JOIN departments d ON d.id = i.department_id
-      WHERE LOWER(i.email) = LOWER($1)
-      LIMIT 1
-      `,
-      [user.email]
-    );
-
-    if (internResult.rows.length === 0) {
-      return res.status(404).json({
-        message: "Intern profile not found.",
-      });
-    }
-
-    const intern = internResult.rows[0];
-    const eligibility = await calculateEligibility(intern.id);
-    const certificate = await getCertificateForIntern(intern.id);
-
-    res.json({
-      intern,
-      eligibility,
-      certificate,
-    });
-  } catch (error) {
-    res.status(500).json({
-      message: "Failed to load your certificate.",
-      error: error.message,
-    });
-  }
-});
-
-router.post("/generate/:internId", async (req, res) => {
-  try {
-    const user = await getUserFromRequest(req);
-
-    if (!user) {
-      return res.status(401).json({
-        message: "Please login first.",
-      });
-    }
-
-    if (!["hr", "admin", "mentor"].includes(user.role)) {
+    if (!["hr", "admin"].includes(user.role)) {
       return res.status(403).json({
-        message: "Only HR/Admin/Mentor can generate certificates.",
+        message: "Only HR/Admin can generate certificates.",
       });
     }
 
-    const { internId } = req.params;
+    const internId = req.params.internId || req.body.internId;
 
-    const internResult = await pool.query(
-      `
-      SELECT id, intern_id, full_name, email
-      FROM interns
-      WHERE id = $1
-      LIMIT 1
-      `,
-      [internId]
-    );
+    if (!internId) {
+      return res.status(400).json({
+        message: "Intern ID is required.",
+      });
+    }
 
-    if (internResult.rows.length === 0) {
+    const intern = await getInternById(Number(internId));
+
+    if (!intern) {
       return res.status(404).json({
         message: "Intern not found.",
       });
     }
 
-    const existingCertificate = await getCertificateForIntern(internId);
-
-    if (existingCertificate) {
-      return res.status(409).json({
-        message: "Certificate already generated for this intern.",
-        certificate: existingCertificate,
-      });
-    }
-
-    const eligibility = await calculateEligibility(internId);
+    const eligibility = await calculateTrainingEligibility(intern.id);
 
     if (!eligibility.eligible) {
       return res.status(400).json({
-        message:
-          "Intern is not eligible yet. They must complete at least 75% of theory/video training.",
-        missingRequirements: eligibility.missingRequirements,
+        message: `Intern is not eligible yet. Minimum 75% theory/video training completion required. Current progress is ${eligibility.trainingPercent}%.`,
         eligibility,
       });
     }
 
-    const certificateNumber = generateCertificateNumber(internId);
-    const verificationCode = generateVerificationCode();
+    const certificateNumber = createCertificateNumber();
+    const verificationCode = createVerificationCode();
 
     const result = await pool.query(
       `
       INSERT INTO certificates
       (
         intern_id,
-        issued_by,
         certificate_number,
         verification_code,
         title,
-        status
+        status,
+        issued_at,
+        created_at,
+        updated_at
       )
-      VALUES ($1, $2, $3, $4, 'Training Completion Certificate', 'Issued')
+      VALUES
+      (
+        $1,
+        $2,
+        $3,
+        'Training Completion Certificate',
+        'Issued',
+        CURRENT_TIMESTAMP,
+        CURRENT_TIMESTAMP,
+        CURRENT_TIMESTAMP
+      )
+      ON CONFLICT (intern_id)
+      DO UPDATE SET
+        certificate_number = certificates.certificate_number,
+        verification_code = certificates.verification_code,
+        title = 'Training Completion Certificate',
+        status = 'Issued',
+        updated_at = CURRENT_TIMESTAMP
       RETURNING *
       `,
-      [internId, user.id, certificateNumber, verificationCode]
+      [intern.id, certificateNumber, verificationCode]
     );
+
+    const certificate = await getCertificateByInternId(intern.id);
 
     res.status(201).json({
       message: "Certificate generated successfully.",
-      certificate: result.rows[0],
+      certificate: certificate || result.rows[0],
+      eligibility,
     });
   } catch (error) {
     res.status(500).json({
@@ -315,47 +365,39 @@ router.post("/generate/:internId", async (req, res) => {
       error: error.message,
     });
   }
-});
+};
 
-router.get("/verify/:verificationCode", async (req, res) => {
+router.post("/generate", generateCertificate);
+router.post("/generate/:internId", generateCertificate);
+
+router.get("/eligibility/:internId", async (req, res) => {
   try {
-    const { verificationCode } = req.params;
+    const user = await requireLogin(req, res);
+    if (!user) return;
 
-    const result = await pool.query(
-      `
-      SELECT
-        c.certificate_number,
-        c.verification_code,
-        c.title,
-        c.status,
-        c.issued_at,
-        i.intern_id,
-        i.full_name AS intern_name,
-        i.email AS intern_email,
-        d.name AS department_name
-      FROM certificates c
-      JOIN interns i ON i.id = c.intern_id
-      LEFT JOIN departments d ON d.id = i.department_id
-      WHERE c.verification_code = $1
-      LIMIT 1
-      `,
-      [verificationCode]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({
-        valid: false,
-        message: "Certificate not found.",
+    if (!["hr", "admin", "mentor"].includes(user.role)) {
+      return res.status(403).json({
+        message: "Only HR/Admin/Mentor can check certificate eligibility.",
       });
     }
 
+    const intern = await getInternById(Number(req.params.internId));
+
+    if (!intern) {
+      return res.status(404).json({
+        message: "Intern not found.",
+      });
+    }
+
+    const eligibility = await calculateTrainingEligibility(intern.id);
+
     res.json({
-      valid: true,
-      certificate: result.rows[0],
+      intern,
+      eligibility,
     });
   } catch (error) {
     res.status(500).json({
-      message: "Failed to verify certificate.",
+      message: "Failed to check eligibility.",
       error: error.message,
     });
   }

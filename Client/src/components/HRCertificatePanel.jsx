@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import api from "../api/api";
 
 function HRCertificatePanel() {
-  const [certificates, setCertificates] = useState([]);
+  const [interns, setInterns] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState("");
@@ -14,20 +15,22 @@ function HRCertificatePanel() {
     setMessageType(type);
   };
 
-  const formatDate = (dateValue) => {
-    if (!dateValue) return "-";
-    return String(dateValue).slice(0, 10);
-  };
-
   const loadCertificates = async () => {
     try {
+      setLoading(true);
+      setMessage("");
+      setMessageType("");
+
       const res = await api.get("/certificates/hr");
-      setCertificates(res.data.certificates || []);
+
+      setInterns(res.data.interns || []);
     } catch (error) {
       showMessage(
         error.response?.data?.message || "Failed to load certificates.",
         "error"
       );
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -36,33 +39,55 @@ function HRCertificatePanel() {
       const res = await api.post(`/certificates/generate/${internId}`);
 
       showMessage(res.data.message || "Certificate generated successfully.");
-
       await loadCertificates();
     } catch (error) {
-      const missing = error.response?.data?.missingRequirements || [];
-
-      if (missing.length > 0) {
-        showMessage(missing.join(" "), "error");
-      } else {
-        showMessage(
-          error.response?.data?.message || "Failed to generate certificate.",
-          "error"
-        );
-      }
+      showMessage(
+        error.response?.data?.message || "Failed to generate certificate.",
+        "error"
+      );
     }
+  };
+
+  const formatDate = (dateValue) => {
+    if (!dateValue) return "-";
+
+    return new Date(dateValue).toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
   };
 
   useEffect(() => {
     loadCertificates();
   }, []);
 
+  if (loading) {
+    return (
+      <section className="panel">
+        <div className="ws8-state-card">
+          <h3>Loading Certificates</h3>
+          <p>Please wait while certificate records are loaded.</p>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="panel">
-      <h2>Certificate Generation</h2>
-      <p>
-        Certificates are generated based only on training completion. Intern must
-        complete at least <strong>75%</strong> of theory/video modules.
-      </p>
+      <div className="panel-heading-row">
+        <div>
+          <h2>Certificate Management</h2>
+          <p>
+            Generate certificates for interns who completed at least 75% of
+            theory/video training modules.
+          </p>
+        </div>
+
+        <button type="button" className="outline-small-btn" onClick={loadCertificates}>
+          Refresh
+        </button>
+      </div>
 
       {message && (
         <div className={`message-box ${messageType === "error" ? "error" : ""}`}>
@@ -70,100 +95,86 @@ function HRCertificatePanel() {
         </div>
       )}
 
-      {certificates.length === 0 && (
-        <div className="empty-state">
-          <h3>No intern certificate data yet</h3>
-          <p>Onboard interns first to generate certificates.</p>
-        </div>
-      )}
+      <div className="ws8-hr-certificate-list">
+        {interns.length === 0 && (
+          <div className="ws8-state-card">
+            <h3>No interns found</h3>
+            <p>Onboarded interns will appear here.</p>
+          </div>
+        )}
 
-      <div className="certificate-list">
-        {certificates.map((item) => {
-          const progress = item.eligibility?.trainingPercent || 0;
-          const completed = item.eligibility?.completedRequiredModules || 0;
-          const total = item.eligibility?.totalRequiredModules || 0;
-          const eligible = item.eligibility?.eligible;
+        {interns.map((intern) => {
+          const eligibility = intern.eligibility || {};
+          const certificate = intern.certificate || null;
 
           return (
-            <div className="certificate-card" key={item.id}>
-              <div className="certificate-header">
+            <div className="ws8-hr-cert-card" key={intern.id}>
+              <div className="ws8-hr-cert-top">
                 <div>
-                  <h3>{item.full_name}</h3>
+                  <h3>{intern.full_name || intern.intern_name}</h3>
                   <p>
-                    {item.intern_id} | {item.department_name || "-"}
+                    {intern.email} | {intern.department_name || "No department"}
                   </p>
-                  <p>{item.email}</p>
                 </div>
 
-                <div className="certificate-status-box">
+                <span className={`status ${certificate ? "selected" : "info"}`}>
+                  {certificate ? "Issued" : "Pending"}
+                </span>
+              </div>
+
+              <div className="ws8-hr-cert-metrics">
+                <div>
+                  <span>Training Progress</span>
+                  <strong>{eligibility.trainingPercent || 0}%</strong>
+                </div>
+
+                <div>
+                  <span>Modules</span>
                   <strong>
-                    {item.certificate ? "Issued" : eligible ? "Eligible" : "Pending"}
+                    {eligibility.completedModules || 0}/
+                    {eligibility.totalModules || 0}
                   </strong>
+                </div>
 
-                  <span>
-                    {item.certificate
-                      ? formatDate(item.certificate.issued_at)
-                      : "Certificate Status"}
-                  </span>
+                <div>
+                  <span>Eligibility</span>
+                  <strong>{eligibility.eligible ? "Eligible" : "Not Eligible"}</strong>
                 </div>
               </div>
 
-              <div className="certificate-progress-box">
-                <div className="certificate-progress-top">
-                  <span>Theory/Video Completion</span>
-                  <strong>{progress}%</strong>
-                </div>
-
-                <div className="progress-bar">
-                  <div
-                    className="progress-fill"
-                    style={{
-                      width: `${progress}%`,
-                    }}
-                  ></div>
-                </div>
-
-                <p>
-                  Completed {completed}/{total} required theory/video modules.
-                  Minimum required: 75%.
-                </p>
-              </div>
-
-              <div
-                className={`requirement-item ${
-                  progress >= 75 ? "done" : "pending"
-                }`}
-              >
-                Training Requirement: {progress >= 75 ? "Completed" : "Pending"}
-              </div>
-
-              {item.certificate ? (
-                <div className="certificate-details">
+              {certificate && (
+                <div className="ws8-cert-mini-details">
                   <p>
                     <strong>Certificate Number:</strong>{" "}
-                    {item.certificate.certificate_number}
+                    {certificate.certificate_number}
                   </p>
-
                   <p>
                     <strong>Verification Code:</strong>{" "}
-                    {item.certificate.verification_code}
+                    {certificate.verification_code}
                   </p>
-
                   <p>
-                    <strong>Issued By:</strong>{" "}
-                    {item.certificate.issued_by_name || "-"}
+                    <strong>Issued:</strong> {formatDate(certificate.issued_at)}
                   </p>
                 </div>
-              ) : (
+              )}
+
+              {!certificate && !eligibility.eligible && (
+                <p className="small-text">
+                  Intern must complete at least 75% of theory/video training
+                  modules before certificate generation.
+                </p>
+              )}
+
+              <div className="task-action-row">
                 <button
                   type="button"
                   className="small-btn"
-                  disabled={!eligible}
-                  onClick={() => generateCertificate(item.id)}
+                  onClick={() => generateCertificate(intern.id)}
+                  disabled={Boolean(certificate) || !eligibility.eligible}
                 >
-                  Generate Certificate
+                  {certificate ? "Certificate Issued" : "Generate Certificate"}
                 </button>
-              )}
+              </div>
             </div>
           );
         })}
