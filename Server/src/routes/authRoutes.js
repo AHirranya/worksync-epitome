@@ -25,12 +25,28 @@ const createToken = (user) => {
   );
 };
 
-const setTokenCookie = (res, token) => {
-  res.cookie("token", token, {
+const getCookieOptions = () => {
+  const isProduction = process.env.NODE_ENV === "production";
+
+  return {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "lax",
     maxAge: 7 * 24 * 60 * 60 * 1000,
+  };
+};
+
+const setTokenCookie = (res, token) => {
+  res.cookie("token", token, getCookieOptions());
+};
+
+const clearTokenCookie = (res) => {
+  const isProduction = process.env.NODE_ENV === "production";
+
+  res.clearCookie("token", {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "lax",
   });
 };
 
@@ -191,11 +207,13 @@ router.post("/login", async (req, res) => {
     }
 
     const token = createToken(user);
+
     setTokenCookie(res, token);
 
     res.json({
       message: "Login successful.",
       user: formatUser(user),
+      token,
     });
   } catch (error) {
     res.status(500).json({
@@ -227,15 +245,11 @@ router.get("/me", async (req, res) => {
 });
 
 router.post("/logout", (req, res) => {
-  res.clearCookie("token", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-  });
+  clearTokenCookie(res);
 
   res.json({
     message: "Logout successful.",
   });
 });
 
-module.exports = router;
+module.exports = router;  

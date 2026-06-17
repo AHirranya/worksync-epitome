@@ -53,6 +53,17 @@ function App() {
   const loadLoggedUser = async () => {
     setAuthLoading(true);
 
+    const savedUser = localStorage.getItem("worksync_user");
+    const savedToken = localStorage.getItem("worksync_token");
+
+    if (savedUser && savedToken) {
+      try {
+        setUser(JSON.parse(savedUser));
+      } catch (error) {
+        setUser(null);
+      }
+    }
+
     try {
       const res = await api.get("/auth/me");
 
@@ -61,6 +72,7 @@ function App() {
     } catch (error) {
       setUser(null);
       localStorage.removeItem("worksync_user");
+      localStorage.removeItem("worksync_token");
     } finally {
       setAuthLoading(false);
     }
@@ -90,19 +102,6 @@ function App() {
 
         <Route
           path="/admin-dashboard"
-          element={
-            <ProtectedRoute
-              user={user}
-              loading={authLoading}
-              allowedRoles={["admin"]}
-            >
-              <AdminDashboard />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/admin/dashboard"
           element={
             <ProtectedRoute
               user={user}

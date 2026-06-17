@@ -46,8 +46,10 @@ function LoginPage({ setUser }) {
       });
 
       const loggedUser = res.data.user;
+      const token = res.data.token;
 
       localStorage.setItem("worksync_user", JSON.stringify(loggedUser));
+      localStorage.setItem("worksync_token", token);
 
       if (setUser) {
         setUser(loggedUser);
@@ -242,10 +244,6 @@ function LoginPage({ setUser }) {
             transition: 0.2s ease;
           }
 
-          .auth-pro-form input::placeholder {
-            color: #777777;
-          }
-
           .auth-pro-form input:focus,
           .auth-pro-form select:focus {
             border-color: #ff7a00;
@@ -299,18 +297,6 @@ function LoginPage({ setUser }) {
             margin-top: 4px;
           }
 
-          .auth-pro-submit:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 18px 40px rgba(255, 122, 0, 0.25);
-          }
-
-          .auth-pro-submit:disabled {
-            opacity: 0.65;
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
-          }
-
           .auth-pro-switch {
             margin-top: 24px;
             color: #bdbdbd;
@@ -321,10 +307,6 @@ function LoginPage({ setUser }) {
             color: #ff7a00;
             font-weight: 900;
             text-decoration: none;
-          }
-
-          .auth-pro-switch a:hover {
-            text-decoration: underline;
           }
 
           @media (max-width: 900px) {
@@ -340,21 +322,6 @@ function LoginPage({ setUser }) {
 
             .auth-pro-card {
               padding: 38px;
-            }
-          }
-
-          @media (max-width: 520px) {
-            .auth-pro-page {
-              padding: 30px 16px;
-            }
-
-            .auth-pro-info,
-            .auth-pro-card {
-              padding: 28px;
-            }
-
-            .auth-pro-card-header h2 {
-              font-size: 32px;
             }
           }
         `}

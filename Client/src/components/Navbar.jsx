@@ -20,6 +20,7 @@ function Navbar({ user, setUser }) {
     }
 
     localStorage.removeItem("worksync_user");
+    localStorage.removeItem("worksync_token");
 
     if (setUser) {
       setUser(null);
