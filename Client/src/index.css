@@ -5443,3 +5443,149 @@ tbody tr:hover {
     width: 100%;
   }
 }
+/* STEP 12: ADMIN AUDIT LOGS */
+
+.ws12-audit-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  margin: 22px 0;
+}
+
+.ws12-audit-summary > div {
+  background: #0b0b0b;
+  border: 1px solid rgba(255, 122, 0, 0.18);
+  border-radius: 20px;
+  padding: 22px;
+}
+
+.ws12-audit-summary span {
+  display: block;
+  color: #a8a8a8;
+  font-size: 13px;
+  font-weight: 900;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.ws12-audit-summary strong {
+  color: #ff7a00;
+  font-size: 38px;
+  font-weight: 1000;
+}
+
+.ws12-filter-bar {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1.4fr 0.7fr 1fr 0.8fr auto;
+  gap: 14px;
+  align-items: end;
+  padding: 18px;
+  border: 1px solid rgba(255, 122, 0, 0.18);
+  border-radius: 18px;
+  background: rgba(255, 122, 0, 0.045);
+  margin: 18px 0;
+}
+
+.ws12-filter-field {
+  display: grid;
+  gap: 8px;
+}
+
+.ws12-filter-field label {
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.ws12-filter-field input,
+.ws12-filter-field select {
+  min-height: 48px;
+}
+
+.ws12-wide {
+  min-width: 260px;
+}
+
+.ws12-filter-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.ws12-state-card {
+  text-align: center;
+  padding: 34px;
+  border: 1px dashed rgba(255, 122, 0, 0.3);
+  border-radius: 22px;
+  background: rgba(255, 122, 0, 0.05);
+  margin: 20px 0;
+}
+
+.ws12-state-card h3 {
+  color: #ffffff;
+  margin-bottom: 8px;
+}
+
+.ws12-state-card p {
+  color: #cfcfcf;
+}
+
+.ws12-action-pill {
+  display: inline-flex;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: rgba(255, 122, 0, 0.12);
+  border: 1px solid rgba(255, 122, 0, 0.28);
+  color: #ff7a00;
+  font-size: 12px;
+  font-weight: 1000;
+  white-space: nowrap;
+}
+
+.ws12-route-code {
+  display: inline-block;
+  max-width: 260px;
+  padding: 6px 9px;
+  border-radius: 8px;
+  background: #111111;
+  color: #d6d6d6;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 1100px) {
+  .ws12-filter-bar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ws12-filter-actions {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 750px) {
+  .ws12-audit-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .ws12-filter-bar {
+    grid-template-columns: 1fr;
+  }
+
+  .ws12-wide {
+    min-width: 0;
+  }
+
+  .ws12-filter-actions {
+    flex-direction: column;
+  }
+
+  .ws12-filter-actions button {
+    width: 100%;
+  }
+}

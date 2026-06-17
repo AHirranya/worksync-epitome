@@ -6,6 +6,8 @@ const express = require("express");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
 
+const { auditMiddleware } = require("./utils/auditLogger");
+
 const app = express();
 
 const PORT = process.env.PORT || 5000;
@@ -35,6 +37,8 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
+app.use(auditMiddleware);
+
 const loadRoute = (routePath, routeName) => {
   try {
     return require(routePath);
@@ -56,6 +60,7 @@ const performanceRoutes = loadRoute("./routes/performanceRoutes", "performanceRo
 const certificateRoutes = loadRoute("./routes/certificateRoutes", "certificateRoutes");
 const adminRoutes = loadRoute("./routes/adminRoutes", "adminRoutes");
 const summaryRoutes = loadRoute("./routes/summaryRoutes", "summaryRoutes");
+const auditRoutes = loadRoute("./routes/auditRoutes", "auditRoutes");
 
 app.get("/", (req, res) => {
   res.json({
@@ -80,6 +85,7 @@ app.get("/api", (req, res) => {
       certificates: "/api/certificates",
       admin: "/api/admin",
       summary: "/api/summary",
+      audit: "/api/audit",
     },
   });
 });
@@ -103,8 +109,9 @@ if (performanceRoutes) app.use("/api/performance", performanceRoutes);
 if (certificateRoutes) app.use("/api/certificates", certificateRoutes);
 if (adminRoutes) app.use("/api/admin", adminRoutes);
 if (summaryRoutes) app.use("/api/summary", summaryRoutes);
+if (auditRoutes) app.use("/api/audit", auditRoutes);
 
-app.use((req, res, next) => {
+app.use((req, res) => {
   if (req.path.startsWith("/api")) {
     return res.status(404).json({
       message: "API route not found.",
@@ -143,5 +150,6 @@ app.listen(PORT, () => {
   console.log(`WorkSync server running on port ${PORT}`);
   console.log("Health check: /api/health");
   console.log(`Frontend URL: ${process.env.FRONTEND_URL || "Not set"}`);
+  console.log("Audit logs: /api/audit");
   console.log("==============================================");
 });

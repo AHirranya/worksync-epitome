@@ -2,9 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import api from "../api/api";
+
 import LoadingState from "../components/LoadingState";
 import EmptyState from "../components/EmptyState";
 import ErrorState from "../components/ErrorState";
+import AdminAuditPanel from "../components/AdminAuditPanel";
 
 function AdminDashboard() {
   const [users, setUsers] = useState([]);
@@ -47,6 +49,7 @@ function AdminDashboard() {
       setUsersError("");
 
       const res = await api.get("/admin/users");
+
       setUsers(res.data.users || []);
     } catch (error) {
       setUsersError(error.response?.data?.message || "Failed to load users.");
@@ -61,6 +64,7 @@ function AdminDashboard() {
       setDepartmentsError("");
 
       const res = await api.get("/admin/departments");
+
       setDepartments(res.data.departments || []);
     } catch (error) {
       setDepartmentsError(
@@ -436,12 +440,15 @@ function AdminDashboard() {
           />
         )}
 
-        {!usersLoading && !usersError && users.length > 0 && filteredUsers.length === 0 && (
-          <EmptyState
-            title="No matching users"
-            message="Try changing the search text or role filter."
-          />
-        )}
+        {!usersLoading &&
+          !usersError &&
+          users.length > 0 &&
+          filteredUsers.length === 0 && (
+            <EmptyState
+              title="No matching users"
+              message="Try changing the search text or role filter."
+            />
+          )}
 
         {!usersLoading && !usersError && filteredUsers.length > 0 && (
           <div className="table-wrapper">
@@ -568,7 +575,8 @@ function AdminDashboard() {
         </div>
 
         <p className="ws-result-count">
-          Showing {filteredDepartments.length} of {departments.length} departments
+          Showing {filteredDepartments.length} of {departments.length}{" "}
+          departments
         </p>
 
         {departmentsLoading && <LoadingState type="table" />}
@@ -642,6 +650,8 @@ function AdminDashboard() {
             </div>
           )}
       </section>
+
+      <AdminAuditPanel />
     </main>
   );
 }
