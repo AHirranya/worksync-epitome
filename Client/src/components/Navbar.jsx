@@ -16,7 +16,7 @@ function Navbar({ user, setUser }) {
     try {
       await api.post("/auth/logout");
     } catch (error) {
-      console.log("Logout API failed:", error.response?.data || error.message);
+      console.log("Logout failed:", error.response?.data || error.message);
     }
 
     localStorage.removeItem("worksync_user");

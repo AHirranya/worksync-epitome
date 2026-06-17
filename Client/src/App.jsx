@@ -21,7 +21,7 @@ function DashboardRedirect({ user, loading }) {
       <main className="dashboard-page">
         <div className="dashboard-header">
           <h1>Loading Dashboard</h1>
-          <p>Please wait...</p>
+          <p>Please wait while we verify your session.</p>
         </div>
       </main>
     );
@@ -31,15 +31,17 @@ function DashboardRedirect({ user, loading }) {
     return <Navigate to="/login" replace />;
   }
 
-  if (user.role === "admin") {
+  const role = String(user.role || "").toLowerCase();
+
+  if (role === "admin") {
     return <Navigate to="/admin-dashboard" replace />;
   }
 
-  if (["hr", "mentor"].includes(user.role)) {
+  if (role === "hr" || role === "mentor") {
     return <Navigate to="/hr-dashboard" replace />;
   }
 
-  if (user.role === "intern") {
+  if (role === "intern") {
     return <Navigate to="/intern-dashboard" replace />;
   }
 
@@ -61,6 +63,8 @@ function App() {
         setUser(JSON.parse(savedUser));
       } catch (error) {
         setUser(null);
+        localStorage.removeItem("worksync_user");
+        localStorage.removeItem("worksync_token");
       }
     }
 

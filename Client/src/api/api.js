@@ -23,4 +23,18 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error.response?.status;
+
+    if (status === 401) {
+      localStorage.removeItem("worksync_user");
+      localStorage.removeItem("worksync_token");
+    }
+
+    return Promise.reject(error);
+  }
+);
+
 export default api;

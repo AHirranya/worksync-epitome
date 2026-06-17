@@ -7,8 +7,8 @@ function ProtectedRoute({ user, loading, allowedRoles, children }) {
     return (
       <main className="dashboard-page">
         <div className="dashboard-header">
-          <h1>Checking Access</h1>
-          <p>Please wait while we verify your account...</p>
+          <h1>Loading</h1>
+          <p>Checking your login session...</p>
         </div>
       </main>
     );
@@ -18,8 +18,17 @@ function ProtectedRoute({ user, loading, allowedRoles, children }) {
     return <Navigate to="/login" replace />;
   }
 
-  if (allowedRoles && !allowedRoles.includes(user.role)) {
-    return <Navigate to="/" replace />;
+  const userRole = String(user.role || "").toLowerCase();
+
+  if (allowedRoles && !allowedRoles.includes(userRole)) {
+    return (
+      <main className="dashboard-page">
+        <div className="dashboard-header">
+          <h1>Access Denied</h1>
+          <p>You do not have permission to access this dashboard.</p>
+        </div>
+      </main>
+    );
   }
 
   return children;

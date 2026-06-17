@@ -7,7 +7,7 @@ const pool = require("../config/db");
 
 const router = express.Router();
 
-const JWT_SECRET = process.env.JWT_SECRET || "worksync_secret_key";
+const JWT_SECRET = process.env.JWT_SECRET || "worksync_secret_key_change_this";
 
 const allowedRoles = ["admin", "hr", "mentor", "intern", "user"];
 
@@ -60,12 +60,21 @@ const formatUser = (user) => {
   };
 };
 
+const getTokenFromRequest = (req) => {
+  const cookieToken = req.cookies?.token;
+
+  const authHeader = req.headers.authorization;
+  const bearerToken =
+    authHeader && authHeader.startsWith("Bearer ")
+      ? authHeader.replace("Bearer ", "")
+      : null;
+
+  return cookieToken || bearerToken || null;
+};
+
 const getUserFromRequest = async (req) => {
   try {
-    const token =
-      req.cookies?.token ||
-      req.headers.authorization?.replace("Bearer ", "") ||
-      null;
+    const token = getTokenFromRequest(req);
 
     if (!token) {
       return null;
@@ -99,7 +108,7 @@ router.post("/register", async (req, res) => {
       });
     }
 
-    if (password.length < 6) {
+    if (String(password).length < 6) {
       return res.status(400).json({
         message: "Password must be at least 6 characters.",
       });
@@ -123,7 +132,7 @@ router.post("/register", async (req, res) => {
       });
     }
 
-    const passwordHash = await bcrypt.hash(password, 10);
+    const passwordHash = await bcrypt.hash(String(password), 10);
 
     const result = await pool.query(
       `
@@ -137,7 +146,7 @@ router.post("/register", async (req, res) => {
       VALUES ($1, $2, $3, 'user')
       RETURNING id, full_name, email, role
       `,
-      [fullName.trim(), cleanEmail, passwordHash]
+      [String(fullName).trim(), cleanEmail, passwordHash]
     );
 
     res.status(201).json({
@@ -190,7 +199,10 @@ router.post("/login", async (req, res) => {
 
     const user = result.rows[0];
 
-    const passwordMatches = await bcrypt.compare(password, user.password_hash);
+    const passwordMatches = await bcrypt.compare(
+      String(password),
+      user.password_hash
+    );
 
     if (!passwordMatches) {
       return res.status(401).json({
@@ -252,4 +264,4 @@ router.post("/logout", (req, res) => {
   });
 });
 
-module.exports = router;  
+module.exports = router;

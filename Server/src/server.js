@@ -1,9 +1,10 @@
 // Server/src/server.js
 
+require("dotenv").config();
+
 const express = require("express");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
-require("dotenv").config();
 
 const authRoutes = require("./routes/authRoutes");
 const applicantRoutes = require("./routes/applicantRoutes");
@@ -19,11 +20,25 @@ const adminRoutes = require("./routes/adminRoutes");
 const app = express();
 
 const PORT = process.env.PORT || 5000;
-const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
+
+const allowedOrigins = [
+  "http://localhost:5173",
+  process.env.FRONTEND_URL,
+].filter(Boolean);
 
 app.use(
   cors({
-    origin: FRONTEND_URL,
+    origin: function (origin, callback) {
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error("Not allowed by CORS"));
+    },
     credentials: true,
   })
 );
@@ -63,15 +78,14 @@ app.use((req, res) => {
 });
 
 app.use((error, req, res, next) => {
-  console.error("Server error:", error.message);
+  console.error("Server Error:", error.message);
 
   res.status(500).json({
     message: "Internal server error.",
-    error: error.message,
+    error: process.env.NODE_ENV === "production" ? undefined : error.message,
   });
 });
 
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`Frontend allowed: ${FRONTEND_URL}`);
+  console.log(`WorkSync server running on port ${PORT}`);
 });
