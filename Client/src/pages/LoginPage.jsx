@@ -77,15 +77,14 @@ function LoginPage({ setUser, onLoginSuccess }) {
         onLoginSuccess(loggedInUser, token);
       }
 
-      showMessage("Login successful.");
-
       navigate(getDashboardPath(loggedInUser.role), { replace: true });
     } catch (error) {
       localStorage.removeItem("worksync_user");
       localStorage.removeItem("worksync_token");
 
       showMessage(
-        error.response?.data?.message || "Login failed. Please check your details.",
+        error.response?.data?.message ||
+          "Login failed. Please check your email, password, and role.",
         "error"
       );
     } finally {
@@ -94,85 +93,125 @@ function LoginPage({ setUser, onLoginSuccess }) {
   };
 
   return (
-    <main className="auth-page">
-      <section className="auth-card">
-        <div className="auth-header">
-          <span className="auth-badge">WorkSync Login</span>
-          <h1>Welcome Back</h1>
+    <main className="ws-login-page">
+      <section className="ws-login-shell">
+        <div className="ws-login-showcase">
+          <div className="ws-login-mini-logo">WS</div>
+
+          <span className="ws-login-eyebrow">Internship Lifecycle Platform</span>
+
+          <h1>
+            Manage internships with one clean WorkSync workspace.
+          </h1>
+
           <p>
-            Login to continue to your role-based WorkSync dashboard.
+            Login as Admin, HR, Mentor, or Intern to manage onboarding,
+            training, attendance, work logs, certificates, and reports.
           </p>
+
+          <div className="ws-login-feature-grid">
+            <div>
+              <strong>Training</strong>
+              <span>Theory, video, and test modules</span>
+            </div>
+
+            <div>
+              <strong>Attendance</strong>
+              <span>Breaks and net working hours</span>
+            </div>
+
+            <div>
+              <strong>Certificates</strong>
+              <span>PDF-ready completion certificates</span>
+            </div>
+
+            <div>
+              <strong>Reports</strong>
+              <span>HR and admin analytics</span>
+            </div>
+          </div>
         </div>
 
-        {message && (
-          <div className={`message-box ${messageType === "error" ? "error" : ""}`}>
-            {message}
+        <section className="ws-login-card">
+          <div className="ws-login-card-header">
+            <span>Secure Login</span>
+            <h2>Welcome Back</h2>
+            <p>Choose your role and continue to your dashboard.</p>
           </div>
-        )}
 
-        <form className="auth-form" onSubmit={loginUser}>
-          <label>
-            Role
-            <select
-              name="role"
-              value={form.role}
-              onChange={updateForm}
-              required
+          {message && (
+            <div
+              className={`message-box ${
+                messageType === "error" ? "error" : ""
+              }`}
             >
-              <option value="admin">Admin</option>
-              <option value="hr">HR</option>
-              <option value="mentor">Mentor</option>
-              <option value="intern">Intern</option>
-              <option value="user">Applicant / User</option>
-            </select>
-          </label>
+              {message}
+            </div>
+          )}
 
-          <label>
-            Email
-            <input
-              type="email"
-              name="email"
-              value={form.email}
-              onChange={updateForm}
-              placeholder="Enter your email"
-              autoComplete="email"
-              required
-            />
-          </label>
-
-          <label>
-            Password
-            <div className="password-input-wrap">
-              <input
-                type={showPassword ? "text" : "password"}
-                name="password"
-                value={form.password}
+          <form className="ws-login-form" onSubmit={loginUser}>
+            <label>
+              Role
+              <select
+                name="role"
+                value={form.role}
                 onChange={updateForm}
-                placeholder="Enter your password"
-                autoComplete="current-password"
+                required
+              >
+                <option value="admin">Admin</option>
+                <option value="hr">HR</option>
+                <option value="mentor">Mentor</option>
+                <option value="intern">Intern</option>
+                <option value="user">Applicant / User</option>
+              </select>
+            </label>
+
+            <label>
+              Email Address
+              <input
+                type="email"
+                name="email"
+                value={form.email}
+                onChange={updateForm}
+                placeholder="Enter your email"
+                autoComplete="email"
                 required
               />
+            </label>
 
-              <button
-                type="button"
-                className="password-toggle-btn"
-                onClick={() => setShowPassword((prev) => !prev)}
-              >
-                {showPassword ? "Hide" : "Show"}
-              </button>
-            </div>
-          </label>
+            <label>
+              Password
+              <div className="ws-password-wrap">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  name="password"
+                  value={form.password}
+                  onChange={updateForm}
+                  placeholder="Enter your password"
+                  autoComplete="current-password"
+                  required
+                />
 
-          <button type="submit" disabled={loading}>
-            {loading ? "Logging in..." : "Login"}
-          </button>
-        </form>
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                >
+                  {showPassword ? "Hide" : "Show"}
+                </button>
+              </div>
+            </label>
 
-        <div className="auth-footer">
-          <p>
-            New applicant? <Link to="/register">Register here</Link>
-          </p>
-        </div>
+            <button type="submit" className="ws-login-submit" disabled={loading}>
+              {loading ? "Logging in..." : "Login to Dashboard"}
+            </button>
+          </form>
+
+          <div className="ws-login-footer">
+            <p>
+              New applicant? <Link to="/register">Register here</Link>
+            </p>
+          </div>
+        </section>
       </section>
     </main>
   );
