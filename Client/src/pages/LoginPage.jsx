@@ -28,7 +28,8 @@ function LoginPage({ setUser, onLoginSuccess }) {
     const cleanRole = String(role || "").toLowerCase();
 
     if (cleanRole === "admin") return "/admin-dashboard";
-    if (cleanRole === "hr" || cleanRole === "mentor") return "/hr-dashboard";
+    if (cleanRole === "hr") return "/hr-dashboard";
+    if (cleanRole === "mentor") return "/mentor-dashboard";
     if (cleanRole === "intern") return "/intern-dashboard";
 
     return "/";
@@ -100,9 +101,7 @@ function LoginPage({ setUser, onLoginSuccess }) {
 
           <span className="ws-login-eyebrow">Internship Lifecycle Platform</span>
 
-          <h1>
-            Manage internships with one clean WorkSync workspace.
-          </h1>
+          <h1>Manage internships with one clean WorkSync workspace.</h1>
 
           <p>
             Login as Admin, HR, Mentor, or Intern to manage onboarding,
@@ -121,8 +120,8 @@ function LoginPage({ setUser, onLoginSuccess }) {
             </div>
 
             <div>
-              <strong>Certificates</strong>
-              <span>PDF-ready completion certificates</span>
+              <strong>Mentor Review</strong>
+              <span>Work log review and feedback</span>
             </div>
 
             <div>

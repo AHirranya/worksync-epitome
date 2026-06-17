@@ -71,6 +71,7 @@ const adminRoutes = loadRoute("./routes/adminRoutes", "adminRoutes");
 const summaryRoutes = loadRoute("./routes/summaryRoutes", "summaryRoutes");
 const auditRoutes = loadRoute("./routes/auditRoutes", "auditRoutes");
 const reportRoutes = loadRoute("./routes/reportRoutes", "reportRoutes");
+const mentorRoutes = loadRoute("./routes/mentorRoutes", "mentorRoutes");
 
 app.get("/", (req, res) => {
   res.json({
@@ -97,6 +98,7 @@ app.get("/api", (req, res) => {
       summary: "/api/summary",
       audit: "/api/audit",
       reports: "/api/reports",
+      mentor: "/api/mentor",
     },
   });
 });
@@ -122,6 +124,7 @@ if (adminRoutes) app.use("/api/admin", adminRoutes);
 if (summaryRoutes) app.use("/api/summary", summaryRoutes);
 if (auditRoutes) app.use("/api/audit", auditRoutes);
 if (reportRoutes) app.use("/api/reports", reportRoutes);
+if (mentorRoutes) app.use("/api/mentor", mentorRoutes);
 
 app.use((req, res) => {
   if (req.path.startsWith("/api")) {
@@ -164,5 +167,6 @@ app.listen(PORT, () => {
   console.log(`Frontend URL: ${process.env.FRONTEND_URL || "Not set"}`);
   console.log("Audit logs: /api/audit");
   console.log("Reports: /api/reports");
+  console.log("Mentor dashboard: /api/mentor");
   console.log("==============================================");
 });

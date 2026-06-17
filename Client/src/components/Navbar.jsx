@@ -11,7 +11,8 @@ function Navbar({ user, onLogout, logout }) {
     const role = String(activeUser?.role || "").toLowerCase();
 
     if (role === "admin") return "/admin-dashboard";
-    if (role === "hr" || role === "mentor") return "/hr-dashboard";
+    if (role === "hr") return "/hr-dashboard";
+    if (role === "mentor") return "/mentor-dashboard";
     if (role === "intern") return "/intern-dashboard";
 
     return "/login";
@@ -21,7 +22,8 @@ function Navbar({ user, onLogout, logout }) {
     const role = String(activeUser?.role || "").toLowerCase();
 
     if (role === "admin") return "Admin Dashboard";
-    if (role === "hr" || role === "mentor") return "HR Dashboard";
+    if (role === "hr") return "HR Dashboard";
+    if (role === "mentor") return "Mentor Dashboard";
     if (role === "intern") return "Intern Dashboard";
 
     return "Dashboard";
