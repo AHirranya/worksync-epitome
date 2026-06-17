@@ -21,6 +21,7 @@ function safeParseUser() {
 function ProtectedRoute({ user, loading, allowedRoles, children }) {
   const storedUser = safeParseUser();
   const token = localStorage.getItem("worksync_token");
+  const manualLogout = localStorage.getItem("worksync_manual_logout") === "true";
 
   const activeUser = user || storedUser;
 
@@ -39,6 +40,10 @@ function ProtectedRoute({ user, loading, allowedRoles, children }) {
   }
 
   if (!token || token === "undefined" || token === "null" || !activeUser) {
+    if (manualLogout) {
+      return <Navigate to="/login" replace />;
+    }
+
     return <Navigate to="/session-expired" replace />;
   }
 

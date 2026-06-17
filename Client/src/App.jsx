@@ -1,7 +1,7 @@
 // Client/src/App.jsx
 
 import { useEffect, useState } from "react";
-import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import api from "./api/api";
 
@@ -38,7 +38,6 @@ function safeParseUser() {
 
 function App() {
   const location = useLocation();
-  const navigate = useNavigate();
 
   const [user, setUser] = useState(() => safeParseUser());
   const [loading, setLoading] = useState(true);
@@ -63,6 +62,13 @@ function App() {
   const loadLoggedInUser = async () => {
     try {
       const token = localStorage.getItem("worksync_token");
+      const manualLogout = localStorage.getItem("worksync_manual_logout") === "true";
+
+      if (manualLogout) {
+        clearSession();
+        setLoading(false);
+        return;
+      }
 
       if (!token || token === "undefined" || token === "null") {
         clearSession();
@@ -89,8 +95,13 @@ function App() {
 
   const handleLogout = () => {
     localStorage.setItem("worksync_manual_logout", "true");
-    clearSession();
-    navigate("/login", { replace: true });
+    localStorage.removeItem("worksync_user");
+    localStorage.removeItem("worksync_token");
+
+    setUser(null);
+    window.dispatchEvent(new Event("worksync-auth-cleared"));
+
+    window.location.replace("/login");
   };
 
   const handleLoginSuccess = (loggedInUser, token) => {

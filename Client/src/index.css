@@ -5589,3 +5589,47 @@ tbody tr:hover {
     width: 100%;
   }
 }
+.nav-logout-btn {
+  border: none;
+  outline: none;
+  cursor: pointer;
+  background: #ff7a00;
+  color: #000000;
+  font-weight: 1000;
+  padding: 14px 26px;
+  border-radius: 14px;
+  font-size: 15px;
+}
+
+.nav-logout-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 32px rgba(255, 122, 0, 0.22);
+}
+.password-input-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.password-input-wrap input {
+  width: 100%;
+  padding-right: 90px;
+}
+
+.password-toggle-btn {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 122, 0, 0.35);
+  background: rgba(255, 122, 0, 0.1);
+  color: #ff7a00;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.password-toggle-btn:hover {
+  background: rgba(255, 122, 0, 0.18);
+}
