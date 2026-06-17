@@ -1,7 +1,7 @@
 // Client/src/App.jsx
 
 import { useEffect, useState } from "react";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 
 import api from "./api/api";
 
@@ -87,7 +87,7 @@ function App() {
     try {
       await api.post("/auth/logout");
     } catch (error) {
-      // logout should continue even if backend logout fails
+      // continue logout even if backend logout fails
     }
 
     localStorage.removeItem("worksync_user");
@@ -113,7 +113,7 @@ function App() {
   }, []);
 
   return (
-    <BrowserRouter>
+    <>
       <Navbar user={user} onLogout={handleLogout} logout={handleLogout} />
 
       <Routes>
@@ -196,7 +196,7 @@ function App() {
 
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
-    </BrowserRouter>
+    </>
   );
 }
 
