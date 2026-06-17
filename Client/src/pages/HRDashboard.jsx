@@ -2,11 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import api from "../api/api";
+
 import LoadingState from "../components/LoadingState";
 import EmptyState from "../components/EmptyState";
 import ErrorState from "../components/ErrorState";
+
 import HRAttendanceWorkLogPanel from "../components/HRAttendanceWorkLogPanel";
 import HRCertificatePanel from "../components/HRCertificatePanel";
+import ReportsPanel from "../components/ReportsPanel";
 
 function HRDashboard() {
   const [activeSection, setActiveSection] = useState("applicants");
@@ -279,8 +282,8 @@ function HRDashboard() {
       <section className="dashboard-header">
         <h1>HR Dashboard</h1>
         <p>
-          Manage applicants, onboarding, interns, attendance, work logs, and
-          training certificates.
+          Manage applicants, onboarding, interns, attendance, work logs,
+          certificates, and reports.
         </p>
       </section>
 
@@ -336,6 +339,16 @@ function HRDashboard() {
             onClick={() => setActiveSection("certificates")}
           >
             Certificates
+          </button>
+
+          <button
+            type="button"
+            className={
+              activeSection === "reports" ? "small-btn" : "outline-small-btn"
+            }
+            onClick={() => setActiveSection("reports")}
+          >
+            Reports
           </button>
         </div>
       </section>
@@ -795,6 +808,8 @@ function HRDashboard() {
       {activeSection === "attendance" && <HRAttendanceWorkLogPanel />}
 
       {activeSection === "certificates" && <HRCertificatePanel />}
+
+      {activeSection === "reports" && <ReportsPanel />}
     </main>
   );
 }

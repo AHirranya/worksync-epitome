@@ -6,8 +6,6 @@ const express = require("express");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
 
-const { auditMiddleware } = require("./utils/auditLogger");
-
 const app = express();
 
 const PORT = process.env.PORT || 5000;
@@ -17,6 +15,17 @@ const allowedOrigins = [
   "http://localhost:3000",
   process.env.FRONTEND_URL,
 ].filter(Boolean);
+
+const loadAuditMiddleware = () => {
+  try {
+    const { auditMiddleware } = require("./utils/auditLogger");
+    return auditMiddleware;
+  } catch (error) {
+    console.warn("Audit middleware not loaded.");
+    console.warn(error.message);
+    return (req, res, next) => next();
+  }
+};
 
 app.use(
   cors({
@@ -37,7 +46,7 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-app.use(auditMiddleware);
+app.use(loadAuditMiddleware());
 
 const loadRoute = (routePath, routeName) => {
   try {
@@ -61,6 +70,7 @@ const certificateRoutes = loadRoute("./routes/certificateRoutes", "certificateRo
 const adminRoutes = loadRoute("./routes/adminRoutes", "adminRoutes");
 const summaryRoutes = loadRoute("./routes/summaryRoutes", "summaryRoutes");
 const auditRoutes = loadRoute("./routes/auditRoutes", "auditRoutes");
+const reportRoutes = loadRoute("./routes/reportRoutes", "reportRoutes");
 
 app.get("/", (req, res) => {
   res.json({
@@ -86,6 +96,7 @@ app.get("/api", (req, res) => {
       admin: "/api/admin",
       summary: "/api/summary",
       audit: "/api/audit",
+      reports: "/api/reports",
     },
   });
 });
@@ -110,6 +121,7 @@ if (certificateRoutes) app.use("/api/certificates", certificateRoutes);
 if (adminRoutes) app.use("/api/admin", adminRoutes);
 if (summaryRoutes) app.use("/api/summary", summaryRoutes);
 if (auditRoutes) app.use("/api/audit", auditRoutes);
+if (reportRoutes) app.use("/api/reports", reportRoutes);
 
 app.use((req, res) => {
   if (req.path.startsWith("/api")) {
@@ -151,5 +163,6 @@ app.listen(PORT, () => {
   console.log("Health check: /api/health");
   console.log(`Frontend URL: ${process.env.FRONTEND_URL || "Not set"}`);
   console.log("Audit logs: /api/audit");
+  console.log("Reports: /api/reports");
   console.log("==============================================");
 });

@@ -6,6 +6,7 @@ import api from "../api/api";
 import LoadingState from "../components/LoadingState";
 import EmptyState from "../components/EmptyState";
 import ErrorState from "../components/ErrorState";
+import ReportsPanel from "../components/ReportsPanel";
 import AdminAuditPanel from "../components/AdminAuditPanel";
 
 function AdminDashboard() {
@@ -49,7 +50,6 @@ function AdminDashboard() {
       setUsersError("");
 
       const res = await api.get("/admin/users");
-
       setUsers(res.data.users || []);
     } catch (error) {
       setUsersError(error.response?.data?.message || "Failed to load users.");
@@ -64,7 +64,6 @@ function AdminDashboard() {
       setDepartmentsError("");
 
       const res = await api.get("/admin/departments");
-
       setDepartments(res.data.departments || []);
     } catch (error) {
       setDepartmentsError(
@@ -274,8 +273,8 @@ function AdminDashboard() {
       <section className="dashboard-header">
         <h1>Admin Dashboard</h1>
         <p>
-          Manage platform users, user roles, departments, and WorkSync system
-          access.
+          Manage platform users, user roles, departments, reports, and complete
+          WorkSync system access.
         </p>
       </section>
 
@@ -650,6 +649,8 @@ function AdminDashboard() {
             </div>
           )}
       </section>
+
+      <ReportsPanel />
 
       <AdminAuditPanel />
     </main>
