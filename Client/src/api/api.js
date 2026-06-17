@@ -14,7 +14,7 @@ api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem("worksync_token");
 
-    if (token) {
+    if (token && token !== "undefined" && token !== "null") {
       config.headers.Authorization = `Bearer ${token}`;
     }
 
@@ -31,11 +31,14 @@ api.interceptors.response.use(
 
     const isAuthRequest =
       requestUrl.includes("/auth/login") ||
-      requestUrl.includes("/auth/register");
+      requestUrl.includes("/auth/register") ||
+      requestUrl.includes("/auth/logout");
 
     if (status === 401 && !isAuthRequest) {
       localStorage.removeItem("worksync_user");
       localStorage.removeItem("worksync_token");
+
+      window.dispatchEvent(new Event("worksync-auth-cleared"));
 
       if (
         window.location.pathname !== "/login" &&

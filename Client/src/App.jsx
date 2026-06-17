@@ -1,7 +1,7 @@
 // Client/src/App.jsx
 
 import { useEffect, useState } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import api from "./api/api";
 
@@ -37,6 +37,8 @@ function safeParseUser() {
 }
 
 function App() {
+  const location = useLocation();
+
   const [user, setUser] = useState(() => safeParseUser());
   const [loading, setLoading] = useState(true);
 
@@ -50,50 +52,47 @@ function App() {
     return "/";
   };
 
+  const clearSession = () => {
+    localStorage.removeItem("worksync_user");
+    localStorage.removeItem("worksync_token");
+    setUser(null);
+  };
+
   const loadLoggedInUser = async () => {
     try {
       const token = localStorage.getItem("worksync_token");
 
       if (!token || token === "undefined" || token === "null") {
-        localStorage.removeItem("worksync_user");
-        localStorage.removeItem("worksync_token");
-        setUser(null);
+        clearSession();
         setLoading(false);
         return;
       }
 
       const res = await api.get("/auth/me");
-
       const loggedInUser = res.data.user;
 
       if (loggedInUser) {
         localStorage.setItem("worksync_user", JSON.stringify(loggedInUser));
         setUser(loggedInUser);
       } else {
-        localStorage.removeItem("worksync_user");
-        localStorage.removeItem("worksync_token");
-        setUser(null);
+        clearSession();
       }
     } catch (error) {
-      localStorage.removeItem("worksync_user");
-      localStorage.removeItem("worksync_token");
-      setUser(null);
+      clearSession();
     } finally {
       setLoading(false);
     }
   };
 
   const handleLogout = async () => {
+    clearSession();
+
     try {
       await api.post("/auth/logout");
     } catch (error) {
-      // continue logout even if backend logout fails
+      // logout should still continue even if backend logout fails
     }
 
-    localStorage.removeItem("worksync_user");
-    localStorage.removeItem("worksync_token");
-
-    setUser(null);
     window.location.href = "/login";
   };
 
@@ -110,11 +109,24 @@ function App() {
 
   useEffect(() => {
     loadLoggedInUser();
+
+    const handleAuthCleared = () => {
+      setUser(null);
+    };
+
+    window.addEventListener("worksync-auth-cleared", handleAuthCleared);
+
+    return () => {
+      window.removeEventListener("worksync-auth-cleared", handleAuthCleared);
+    };
   }, []);
+
+  const publicNoUserPages = ["/login", "/register", "/session-expired"];
+  const navbarUser = publicNoUserPages.includes(location.pathname) ? null : user;
 
   return (
     <>
-      <Navbar user={user} onLogout={handleLogout} logout={handleLogout} />
+      <Navbar user={navbarUser} onLogout={handleLogout} logout={handleLogout} />
 
       <Routes>
         <Route path="/" element={<HomePage />} />

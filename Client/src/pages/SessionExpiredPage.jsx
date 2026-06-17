@@ -1,8 +1,15 @@
 // Client/src/pages/SessionExpiredPage.jsx
 
+import { useEffect } from "react";
 import { Link } from "react-router-dom";
 
 function SessionExpiredPage() {
+  useEffect(() => {
+    localStorage.removeItem("worksync_user");
+    localStorage.removeItem("worksync_token");
+    window.dispatchEvent(new Event("worksync-auth-cleared"));
+  }, []);
+
   return (
     <main className="error-page-wrapper">
       <section className="error-page-card">
