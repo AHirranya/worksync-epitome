@@ -2,91 +2,85 @@
 
 import { useEffect, useState } from "react";
 import api from "../api/api";
-import DashboardQuickNav from "../components/DashboardQuickNav";
+import LoadingState from "../components/LoadingState";
+import EmptyState from "../components/EmptyState";
+import ErrorState from "../components/ErrorState";
 
 function AdminDashboard() {
-  const [summary, setSummary] = useState(null);
   const [users, setUsers] = useState([]);
   const [departments, setDepartments] = useState([]);
 
-  const [newUser, setNewUser] = useState({
+  const [usersLoading, setUsersLoading] = useState(true);
+  const [departmentsLoading, setDepartmentsLoading] = useState(true);
+
+  const [usersError, setUsersError] = useState("");
+  const [departmentsError, setDepartmentsError] = useState("");
+
+  const [userForm, setUserForm] = useState({
     fullName: "",
     email: "",
     password: "",
     role: "hr",
   });
 
-  const [newDepartment, setNewDepartment] = useState({
+  const [departmentForm, setDepartmentForm] = useState({
     name: "",
     code: "",
   });
 
+  const [generatedPassword, setGeneratedPassword] = useState("");
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState("");
-  const [generatedPassword, setGeneratedPassword] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  const adminNavLinks = [
-    { id: "admin-overview", label: "Overview" },
-    { id: "admin-users", label: "Users" },
-    { id: "admin-create-user", label: "Create User" },
-    { id: "admin-departments", label: "Departments" },
-    { id: "admin-settings", label: "Settings" },
-  ];
 
   const showMessage = (text, type = "success") => {
     setMessage(text);
     setMessageType(type);
   };
 
-  const formatDate = (dateValue) => {
-    if (!dateValue) return "-";
-    return String(dateValue).slice(0, 10);
-  };
-
-  const loadSummary = async () => {
-    const res = await api.get("/admin/summary");
-    setSummary(res.data.summary);
-  };
-
   const loadUsers = async () => {
-    const res = await api.get("/admin/users");
-    setUsers(res.data.users || []);
-  };
-
-  const loadDepartments = async () => {
-    const res = await api.get("/admin/departments");
-    setDepartments(res.data.departments || []);
-  };
-
-  const loadDashboard = async () => {
-    setLoading(true);
-    setMessage("");
-
     try {
-      await loadSummary();
-      await loadUsers();
-      await loadDepartments();
+      setUsersLoading(true);
+      setUsersError("");
+
+      const res = await api.get("/admin/users");
+      setUsers(res.data.users || []);
     } catch (error) {
-      showMessage(
-        error.response?.data?.message || "Failed to load admin dashboard.",
-        "error"
-      );
+      setUsersError(error.response?.data?.message || "Failed to load users.");
     } finally {
-      setLoading(false);
+      setUsersLoading(false);
     }
   };
 
-  const updateNewUserField = (e) => {
-    setNewUser({
-      ...newUser,
+  const loadDepartments = async () => {
+    try {
+      setDepartmentsLoading(true);
+      setDepartmentsError("");
+
+      const res = await api.get("/admin/departments");
+      setDepartments(res.data.departments || []);
+    } catch (error) {
+      setDepartmentsError(
+        error.response?.data?.message || "Failed to load departments."
+      );
+    } finally {
+      setDepartmentsLoading(false);
+    }
+  };
+
+  const loadData = async () => {
+    await Promise.all([loadUsers(), loadDepartments()]);
+  };
+
+  const updateUserForm = (e) => {
+    setUserForm({
+      ...userForm,
       [e.target.name]: e.target.value,
     });
   };
 
-  const updateDepartmentField = (e) => {
-    setNewDepartment({
-      ...newDepartment,
+  const updateDepartmentForm = (e) => {
+    setDepartmentForm({
+      ...departmentForm,
       [e.target.name]: e.target.value,
     });
   };
@@ -94,20 +88,23 @@ function AdminDashboard() {
   const createUser = async (e) => {
     e.preventDefault();
 
-    setGeneratedPassword(null);
+    setGeneratedPassword("");
     setMessage("");
+    setMessageType("");
 
     try {
-      const res = await api.post("/admin/users", newUser);
+      const res = await api.post("/admin/users", userForm);
 
       showMessage(res.data.message || "User created successfully.");
-      setGeneratedPassword({
-        email: res.data.user.email,
-        password: res.data.generatedPassword,
-        role: res.data.user.role,
-      });
 
-      setNewUser({
+      setGeneratedPassword(
+        res.data.generatedPassword ||
+          res.data.password ||
+          userForm.password ||
+          ""
+      );
+
+      setUserForm({
         fullName: "",
         email: "",
         password: "",
@@ -115,7 +112,6 @@ function AdminDashboard() {
       });
 
       await loadUsers();
-      await loadSummary();
     } catch (error) {
       showMessage(
         error.response?.data?.message || "Failed to create user.",
@@ -130,9 +126,8 @@ function AdminDashboard() {
         role,
       });
 
-      showMessage(res.data.message || "Role updated successfully.");
+      showMessage(res.data.message || "User role updated successfully.");
       await loadUsers();
-      await loadSummary();
     } catch (error) {
       showMessage(
         error.response?.data?.message || "Failed to update user role.",
@@ -146,11 +141,12 @@ function AdminDashboard() {
       const res = await api.patch(`/admin/users/${userId}/reset-password`);
 
       showMessage(res.data.message || "Password reset successfully.");
-      setGeneratedPassword({
-        email: res.data.user.email,
-        password: res.data.generatedPassword,
-        role: res.data.user.role,
-      });
+
+      setGeneratedPassword(
+        res.data.generatedPassword || res.data.password || ""
+      );
+
+      await loadUsers();
     } catch (error) {
       showMessage(
         error.response?.data?.message || "Failed to reset password.",
@@ -171,7 +167,6 @@ function AdminDashboard() {
 
       showMessage(res.data.message || "User deleted successfully.");
       await loadUsers();
-      await loadSummary();
     } catch (error) {
       showMessage(
         error.response?.data?.message || "Failed to delete user.",
@@ -183,18 +178,20 @@ function AdminDashboard() {
   const createDepartment = async (e) => {
     e.preventDefault();
 
+    setMessage("");
+    setMessageType("");
+
     try {
-      const res = await api.post("/admin/departments", newDepartment);
+      const res = await api.post("/admin/departments", departmentForm);
 
       showMessage(res.data.message || "Department created successfully.");
 
-      setNewDepartment({
+      setDepartmentForm({
         name: "",
         code: "",
       });
 
       await loadDepartments();
-      await loadSummary();
     } catch (error) {
       showMessage(
         error.response?.data?.message || "Failed to create department.",
@@ -214,9 +211,7 @@ function AdminDashboard() {
       const res = await api.delete(`/admin/departments/${departmentId}`);
 
       showMessage(res.data.message || "Department deleted successfully.");
-
       await loadDepartments();
-      await loadSummary();
     } catch (error) {
       showMessage(
         error.response?.data?.message || "Failed to delete department.",
@@ -226,319 +221,297 @@ function AdminDashboard() {
   };
 
   useEffect(() => {
-    loadDashboard();
+    loadData();
   }, []);
-
-  if (loading) {
-    return (
-      <main className="dashboard-page">
-        <div className="dashboard-header">
-          <p className="eyebrow">Admin Workspace</p>
-          <h1>Admin Dashboard</h1>
-          <p>Loading platform control panel...</p>
-        </div>
-      </main>
-    );
-  }
 
   return (
     <main className="dashboard-page">
-      <div className="dashboard-header admin-header">
-        <p className="eyebrow">Admin Workspace</p>
+      <section className="dashboard-header">
         <h1>Admin Dashboard</h1>
         <p>
-          Manage users, roles, HR accounts, mentors, departments, certificate
-          rules, and overall WorkSync platform settings.
+          Manage platform users, user roles, departments, and WorkSync system
+          access.
         </p>
-      </div>
-
-      <DashboardQuickNav links={adminNavLinks} />
+      </section>
 
       {message && (
-        <div className={`message-box ${messageType === "error" ? "error" : ""}`}>
-          {message}
-        </div>
-      )}
-
-      {generatedPassword && (
-        <div className="credentials-box admin-generated-box">
-          <h3>Generated Login Credentials</h3>
-
-          <div className="credentials-grid">
-            <div>
-              <span>Email</span>
-              <strong>{generatedPassword.email}</strong>
-            </div>
-
-            <div>
-              <span>Password</span>
-              <strong>{generatedPassword.password}</strong>
-            </div>
-
-            <div>
-              <span>Role</span>
-              <strong>{generatedPassword.role}</strong>
-            </div>
+        <section className="panel">
+          <div
+            className={`message-box ${messageType === "error" ? "error" : ""}`}
+          >
+            {message}
           </div>
 
-          <p className="warning-text">
-            Save this password now. It will not be shown again after refresh.
-          </p>
-        </div>
+          {generatedPassword && (
+            <div className="ws-highlight-box">
+              <strong>Generated Password:</strong>
+              <p>{generatedPassword}</p>
+            </div>
+          )}
+        </section>
       )}
 
-      <section id="admin-overview" className="stats-grid">
-        <div className="stat-card">
-          <p>Total Users</p>
-          <h2>{summary?.totalUsers || 0}</h2>
-          <span>All registered accounts</span>
+      <section className="panel">
+        <div className="panel-heading-row">
+          <div>
+            <h2>Create Platform User</h2>
+            <p>
+              Create Admin, HR, Mentor, Intern, or Applicant/User accounts from
+              one place.
+            </p>
+          </div>
         </div>
 
-        <div className="stat-card">
-          <p>HR Accounts</p>
-          <h2>{summary?.totalHRs || 0}</h2>
-          <span>HR users managing interns</span>
-        </div>
+        <form className="form-grid" onSubmit={createUser}>
+          <label>
+            Full Name
+            <input
+              type="text"
+              name="fullName"
+              value={userForm.fullName}
+              onChange={updateUserForm}
+              placeholder="Enter full name"
+              required
+            />
+          </label>
 
-        <div className="stat-card">
-          <p>Interns</p>
-          <h2>{summary?.totalInterns || 0}</h2>
-          <span>Onboarded intern accounts</span>
-        </div>
+          <label>
+            Email
+            <input
+              type="email"
+              name="email"
+              value={userForm.email}
+              onChange={updateUserForm}
+              placeholder="Enter email address"
+              required
+            />
+          </label>
 
-        <div className="stat-card">
-          <p>Certificates</p>
-          <h2>{summary?.certificatesIssued || 0}</h2>
-          <span>Issued training certificates</span>
-        </div>
+          <label>
+            Password
+            <input
+              type="text"
+              name="password"
+              value={userForm.password}
+              onChange={updateUserForm}
+              placeholder="Example: 123456"
+              required
+            />
+          </label>
+
+          <label>
+            Role
+            <select
+              name="role"
+              value={userForm.role}
+              onChange={updateUserForm}
+              required
+            >
+              <option value="admin">Admin</option>
+              <option value="hr">HR</option>
+              <option value="mentor">Mentor</option>
+              <option value="intern">Intern</option>
+              <option value="user">Applicant / User</option>
+            </select>
+          </label>
+
+          <div className="form-grid-full">
+            <button type="submit">Create User</button>
+          </div>
+        </form>
       </section>
 
-      <section className="stats-grid">
-        <div className="stat-card">
-          <p>Admins</p>
-          <h2>{summary?.totalAdmins || 0}</h2>
-          <span>Platform control users</span>
+      <section className="panel">
+        <div className="panel-heading-row">
+          <div>
+            <h2>Users & Roles</h2>
+            <p>View all registered users and update their access roles.</p>
+          </div>
+
+          <button
+            type="button"
+            className="outline-small-btn"
+            onClick={loadUsers}
+          >
+            Refresh
+          </button>
         </div>
 
-        <div className="stat-card">
-          <p>Mentors</p>
-          <h2>{summary?.totalMentors || 0}</h2>
-          <span>Assigned support accounts</span>
-        </div>
+        {usersLoading && <LoadingState type="table" />}
 
-        <div className="stat-card">
-          <p>Applicants</p>
-          <h2>{summary?.totalApplicants || 0}</h2>
-          <span>All internship applicants</span>
-        </div>
+        {!usersLoading && usersError && (
+          <ErrorState
+            title="Users not loaded"
+            message={usersError}
+            onRetry={loadUsers}
+          />
+        )}
 
-        <div className="stat-card">
-          <p>Departments</p>
-          <h2>{summary?.totalDepartments || 0}</h2>
-          <span>Active platform departments</span>
-        </div>
-      </section>
+        {!usersLoading && !usersError && users.length === 0 && (
+          <EmptyState
+            title="No users found"
+            message="Created platform users will appear here."
+          />
+        )}
 
-      <section id="admin-users" className="panel">
-        <h2>User & Role Management</h2>
-        <p>
-          View all users, change roles, reset passwords, and remove test
-          accounts.
-        </p>
-
-        <div className="table-wrapper">
-          <table>
-            <thead>
-              <tr>
-                <th>User</th>
-                <th>Email</th>
-                <th>Current Role</th>
-                <th>Change Role</th>
-                <th>Created</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {users.length === 0 && (
+        {!usersLoading && !usersError && users.length > 0 && (
+          <div className="table-wrapper">
+            <table>
+              <thead>
                 <tr>
-                  <td colSpan="6">No users found.</td>
+                  <th>User</th>
+                  <th>Email</th>
+                  <th>Role</th>
+                  <th>Change Role</th>
+                  <th>Actions</th>
                 </tr>
-              )}
+              </thead>
 
-              {users.map((user) => (
-                <tr key={user.id}>
-                  <td>{user.full_name}</td>
-                  <td>{user.email}</td>
+              <tbody>
+                {users.map((item) => (
+                  <tr key={item.id}>
+                    <td>{item.full_name || item.fullName || "-"}</td>
+                    <td>{item.email}</td>
+                    <td>
+                      <span className="status selected">{item.role}</span>
+                    </td>
+                    <td>
+                      <select
+                        value={item.role}
+                        onChange={(e) =>
+                          updateUserRole(item.id, e.target.value)
+                        }
+                      >
+                        <option value="admin">Admin</option>
+                        <option value="hr">HR</option>
+                        <option value="mentor">Mentor</option>
+                        <option value="intern">Intern</option>
+                        <option value="user">Applicant / User</option>
+                      </select>
+                    </td>
+                    <td>
+                      <div className="task-action-row">
+                        <button
+                          type="button"
+                          className="small-btn"
+                          onClick={() => resetPassword(item.id)}
+                        >
+                          Reset Password
+                        </button>
 
-                  <td>
-                    <span className={`status ${user.role}`}>{user.role}</span>
-                  </td>
+                        <button
+                          type="button"
+                          className="outline-small-btn"
+                          onClick={() => deleteUser(item.id)}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
 
-                  <td>
-                    <select
-                      value={user.role}
-                      onChange={(e) => updateUserRole(user.id, e.target.value)}
-                    >
-                      <option value="admin">Admin</option>
-                      <option value="hr">HR</option>
-                      <option value="mentor">Mentor</option>
-                      <option value="intern">Intern</option>
-                      <option value="user">User</option>
-                    </select>
-                  </td>
+      <section className="panel">
+        <div className="panel-heading-row">
+          <div>
+            <h2>Department Management</h2>
+            <p>Create and manage departments used during intern onboarding.</p>
+          </div>
+        </div>
 
-                  <td>{formatDate(user.created_at)}</td>
+        <form className="form-grid" onSubmit={createDepartment}>
+          <label>
+            Department Name
+            <input
+              type="text"
+              name="name"
+              value={departmentForm.name}
+              onChange={updateDepartmentForm}
+              placeholder="Example: Web Development"
+              required
+            />
+          </label>
 
-                  <td>
-                    <div className="admin-action-row">
+          <label>
+            Department Code
+            <input
+              type="text"
+              name="code"
+              value={departmentForm.code}
+              onChange={updateDepartmentForm}
+              placeholder="Example: WD"
+              required
+            />
+          </label>
+
+          <div className="form-grid-full">
+            <button type="submit">Create Department</button>
+          </div>
+        </form>
+
+        <h3 className="section-subtitle">Departments</h3>
+
+        {departmentsLoading && <LoadingState type="table" />}
+
+        {!departmentsLoading && departmentsError && (
+          <ErrorState
+            title="Departments not loaded"
+            message={departmentsError}
+            onRetry={loadDepartments}
+          />
+        )}
+
+        {!departmentsLoading && !departmentsError && departments.length === 0 && (
+          <EmptyState
+            title="No departments found"
+            message="Departments created by admin will appear here."
+          />
+        )}
+
+        {!departmentsLoading && !departmentsError && departments.length > 0 && (
+          <div className="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Department</th>
+                  <th>Code</th>
+                  <th>Created</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {departments.map((dept) => (
+                  <tr key={dept.id}>
+                    <td>{dept.name}</td>
+                    <td>
+                      <span className="status info">{dept.code}</span>
+                    </td>
+                    <td>
+                      {dept.created_at
+                        ? new Date(dept.created_at).toLocaleDateString("en-IN")
+                        : "-"}
+                    </td>
+                    <td>
                       <button
                         type="button"
                         className="outline-small-btn"
-                        onClick={() => resetPassword(user.id)}
-                      >
-                        Reset Password
-                      </button>
-
-                      <button
-                        type="button"
-                        className="danger-small-btn"
-                        onClick={() => deleteUser(user.id)}
+                        onClick={() => deleteDepartment(dept.id)}
                       >
                         Delete
                       </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section id="admin-create-user" className="panel">
-        <h2>Create HR / Mentor / Admin Account</h2>
-        <p>
-          Admin can create platform accounts directly. If password is empty, the
-          system will generate one.
-        </p>
-
-        <form className="admin-form-grid" onSubmit={createUser}>
-          <input
-            type="text"
-            name="fullName"
-            value={newUser.fullName}
-            onChange={updateNewUserField}
-            placeholder="Full name"
-            required
-          />
-
-          <input
-            type="email"
-            name="email"
-            value={newUser.email}
-            onChange={updateNewUserField}
-            placeholder="Email address"
-            required
-          />
-
-          <input
-            type="text"
-            name="password"
-            value={newUser.password}
-            onChange={updateNewUserField}
-            placeholder="Password optional"
-          />
-
-          <select name="role" value={newUser.role} onChange={updateNewUserField}>
-            <option value="admin">Admin</option>
-            <option value="hr">HR</option>
-            <option value="mentor">Mentor</option>
-            <option value="user">User</option>
-          </select>
-
-          <button type="submit">Create User Account</button>
-        </form>
-      </section>
-
-      <section id="admin-departments" className="panel">
-        <h2>Department Management</h2>
-        <p>Add and manage departments used in onboarding and training.</p>
-
-        <form className="admin-form-grid" onSubmit={createDepartment}>
-          <input
-            type="text"
-            name="name"
-            value={newDepartment.name}
-            onChange={updateDepartmentField}
-            placeholder="Department name"
-            required
-          />
-
-          <input
-            type="text"
-            name="code"
-            value={newDepartment.code}
-            onChange={updateDepartmentField}
-            placeholder="Department code"
-            required
-          />
-
-          <button type="submit">Add Department</button>
-        </form>
-
-        <div className="department-admin-grid">
-          {departments.length === 0 && (
-            <div className="empty-state">
-              <h3>No departments found</h3>
-              <p>Add departments to use onboarding and training features.</p>
-            </div>
-          )}
-
-          {departments.map((department) => (
-            <div className="department-admin-card" key={department.id}>
-              <div>
-                <h3>{department.name}</h3>
-                <p>{department.code}</p>
-              </div>
-
-              <button
-                type="button"
-                className="danger-small-btn"
-                onClick={() => deleteDepartment(department.id)}
-              >
-                Delete
-              </button>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section id="admin-settings" className="panel">
-        <h2>System Settings</h2>
-        <p>Current platform rules and configuration summary.</p>
-
-        <div className="admin-settings-grid">
-          <div className="admin-setting-card">
-            <h3>Certificate Rule</h3>
-            <p>{summary?.certificateRule || "75% training completion"}</p>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-
-          <div className="admin-setting-card">
-            <h3>Allowed Roles</h3>
-            <p>admin, hr, mentor, intern, user</p>
-          </div>
-
-          <div className="admin-setting-card">
-            <h3>Certificate Type</h3>
-            <p>Training Completion Certificate</p>
-          </div>
-
-          <div className="admin-setting-card">
-            <h3>Work Modes</h3>
-            <p>Remote, Hybrid, Onsite</p>
-          </div>
-        </div>
+        )}
       </section>
     </main>
   );

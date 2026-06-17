@@ -1,15 +1,19 @@
 // Client/src/components/ProtectedRoute.jsx
 
 import { Navigate } from "react-router-dom";
+import LoadingState from "./LoadingState";
+import ErrorState from "./ErrorState";
 
 function ProtectedRoute({ user, loading, allowedRoles, children }) {
   if (loading) {
     return (
       <main className="dashboard-page">
-        <div className="dashboard-header">
-          <h1>Loading</h1>
-          <p>Checking your login session...</p>
-        </div>
+        <section className="panel">
+          <LoadingState
+            title="Checking session"
+            message="Please wait while we verify your login session."
+          />
+        </section>
       </main>
     );
   }
@@ -23,10 +27,12 @@ function ProtectedRoute({ user, loading, allowedRoles, children }) {
   if (allowedRoles && !allowedRoles.includes(userRole)) {
     return (
       <main className="dashboard-page">
-        <div className="dashboard-header">
-          <h1>Access Denied</h1>
-          <p>You do not have permission to access this dashboard.</p>
-        </div>
+        <section className="panel">
+          <ErrorState
+            title="Access Denied"
+            message="You do not have permission to access this dashboard."
+          />
+        </section>
       </main>
     );
   }
