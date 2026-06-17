@@ -1,36 +1,59 @@
 // Client/src/components/Navbar.jsx
 
-import { Link, NavLink, useNavigate } from "react-router-dom";
-import api from "../api/api";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
-function Navbar({ user, setUser }) {
+function Navbar({ user, onLogout, logout }) {
+  const location = useLocation();
   const navigate = useNavigate();
 
-  const role = String(user?.role || "").toLowerCase();
+  const activeUser = user || null;
 
-  const isAdmin = role === "admin";
-  const isHR = role === "hr" || role === "mentor";
-  const isIntern = role === "intern";
+  const getDashboardPath = () => {
+    const role = String(activeUser?.role || "").toLowerCase();
 
-  const handleLogout = async () => {
-    try {
-      await api.post("/auth/logout");
-    } catch (error) {
-      console.log("Logout failed:", error.response?.data || error.message);
-    }
+    if (role === "admin") return "/admin-dashboard";
+    if (role === "hr" || role === "mentor") return "/hr-dashboard";
+    if (role === "intern") return "/intern-dashboard";
 
+    return "/login";
+  };
+
+  const getDashboardLabel = () => {
+    const role = String(activeUser?.role || "").toLowerCase();
+
+    if (role === "admin") return "Admin Dashboard";
+    if (role === "hr" || role === "mentor") return "HR Dashboard";
+    if (role === "intern") return "Intern Dashboard";
+
+    return "Dashboard";
+  };
+
+  const handleLogoutClick = () => {
+    localStorage.setItem("worksync_manual_logout", "true");
     localStorage.removeItem("worksync_user");
     localStorage.removeItem("worksync_token");
 
-    if (setUser) {
-      setUser(null);
+    if (typeof onLogout === "function") {
+      onLogout();
+      return;
     }
 
-    navigate("/login");
+    if (typeof logout === "function") {
+      logout();
+      return;
+    }
+
+    navigate("/login", { replace: true });
   };
 
+  const hideUserLinks =
+    location.pathname === "/login" ||
+    location.pathname === "/register" ||
+    location.pathname === "/session-expired" ||
+    location.pathname === "/unauthorized";
+
   return (
-    <header className="navbar">
+    <nav className="navbar">
       <Link to="/" className="brand-logo">
         <span className="brand-icon">WS</span>
         <span className="brand-name">
@@ -38,28 +61,37 @@ function Navbar({ user, setUser }) {
         </span>
       </Link>
 
-      <nav className="nav-links">
-        <NavLink to="/">Home</NavLink>
+      <div className="nav-links">
+        <Link to="/">Home</Link>
 
-        {!user && <NavLink to="/apply">Apply</NavLink>}
-
-        {isAdmin && <NavLink to="/admin-dashboard">Admin Dashboard</NavLink>}
-
-        {isHR && <NavLink to="/hr-dashboard">HR Dashboard</NavLink>}
-
-        {isIntern && <NavLink to="/intern-dashboard">Intern Dashboard</NavLink>}
-
-        {!user && <NavLink to="/login">Login</NavLink>}
-
-        {!user && <NavLink to="/register">Register</NavLink>}
-
-        {user && (
-          <button type="button" className="logout-btn" onClick={handleLogout}>
-            Logout
-          </button>
+        {!activeUser && !hideUserLinks && (
+          <>
+            <Link to="/login">Login</Link>
+            <Link to="/register">Register</Link>
+          </>
         )}
-      </nav>
-    </header>
+
+        {activeUser && !hideUserLinks && (
+          <>
+            <Link to={getDashboardPath()}>{getDashboardLabel()}</Link>
+
+            <button
+              type="button"
+              className="nav-logout-btn"
+              onClick={handleLogoutClick}
+            >
+              Logout
+            </button>
+          </>
+        )}
+
+        {hideUserLinks && (
+          <>
+            <Link to="/login">Login</Link>
+          </>
+        )}
+      </div>
+    </nav>
   );
 }
 

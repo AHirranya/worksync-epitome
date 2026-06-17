@@ -1,7 +1,7 @@
 // Client/src/App.jsx
 
 import { useEffect, useState } from "react";
-import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 
 import api from "./api/api";
 
@@ -38,6 +38,7 @@ function safeParseUser() {
 
 function App() {
   const location = useLocation();
+  const navigate = useNavigate();
 
   const [user, setUser] = useState(() => safeParseUser());
   const [loading, setLoading] = useState(true);
@@ -56,6 +57,7 @@ function App() {
     localStorage.removeItem("worksync_user");
     localStorage.removeItem("worksync_token");
     setUser(null);
+    window.dispatchEvent(new Event("worksync-auth-cleared"));
   };
 
   const loadLoggedInUser = async () => {
@@ -72,6 +74,7 @@ function App() {
       const loggedInUser = res.data.user;
 
       if (loggedInUser) {
+        localStorage.removeItem("worksync_manual_logout");
         localStorage.setItem("worksync_user", JSON.stringify(loggedInUser));
         setUser(loggedInUser);
       } else {
@@ -84,19 +87,15 @@ function App() {
     }
   };
 
-  const handleLogout = async () => {
+  const handleLogout = () => {
+    localStorage.setItem("worksync_manual_logout", "true");
     clearSession();
-
-    try {
-      await api.post("/auth/logout");
-    } catch (error) {
-      // logout should still continue even if backend logout fails
-    }
-
-    window.location.href = "/login";
+    navigate("/login", { replace: true });
   };
 
   const handleLoginSuccess = (loggedInUser, token) => {
+    localStorage.removeItem("worksync_manual_logout");
+
     if (token) {
       localStorage.setItem("worksync_token", token);
     }
@@ -121,8 +120,14 @@ function App() {
     };
   }, []);
 
-  const publicNoUserPages = ["/login", "/register", "/session-expired"];
-  const navbarUser = publicNoUserPages.includes(location.pathname) ? null : user;
+  const hideUserNavbarPages = [
+    "/login",
+    "/register",
+    "/session-expired",
+    "/unauthorized",
+  ];
+
+  const navbarUser = hideUserNavbarPages.includes(location.pathname) ? null : user;
 
   return (
     <>

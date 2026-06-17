@@ -7,6 +7,7 @@ function SessionExpiredPage() {
   useEffect(() => {
     localStorage.removeItem("worksync_user");
     localStorage.removeItem("worksync_token");
+    localStorage.removeItem("worksync_manual_logout");
     window.dispatchEvent(new Event("worksync-auth-cleared"));
   }, []);
 

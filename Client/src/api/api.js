@@ -28,13 +28,15 @@ api.interceptors.response.use(
   (error) => {
     const status = error.response?.status;
     const requestUrl = String(error.config?.url || "");
+    const manualLogout = localStorage.getItem("worksync_manual_logout") === "true";
 
     const isAuthRequest =
       requestUrl.includes("/auth/login") ||
       requestUrl.includes("/auth/register") ||
-      requestUrl.includes("/auth/logout");
+      requestUrl.includes("/auth/logout") ||
+      requestUrl.includes("/auth/me");
 
-    if (status === 401 && !isAuthRequest) {
+    if (status === 401 && !isAuthRequest && !manualLogout) {
       localStorage.removeItem("worksync_user");
       localStorage.removeItem("worksync_token");
 
