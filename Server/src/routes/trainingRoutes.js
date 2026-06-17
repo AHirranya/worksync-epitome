@@ -58,8 +58,8 @@ const requireLogin = async (req, res) => {
   return user;
 };
 
-const requireRoles = (user, roles, res) => {
-  if (!roles.includes(user.role)) {
+const requireRoles = (user, allowedRoles, res) => {
+  if (!allowedRoles.includes(user.role)) {
     res.status(403).json({
       message: "You do not have permission for this action.",
     });
@@ -70,7 +70,7 @@ const requireRoles = (user, roles, res) => {
   return true;
 };
 
-const getInternByUserEmail = async (email) => {
+const getInternByEmail = async (email) => {
   const result = await pool.query(
     `
     SELECT id, full_name, email, department_id
@@ -82,6 +82,17 @@ const getInternByUserEmail = async (email) => {
   );
 
   return result.rows[0] || null;
+};
+
+const normalizeModuleType = (type) => {
+  const cleanType = String(type || "").trim().toLowerCase();
+
+  if (["quiz", "assessment", "exam"].includes(cleanType)) return "test";
+  if (["video", "videos"].includes(cleanType)) return "video";
+  if (["theory", "reading", "notes"].includes(cleanType)) return "theory";
+  if (cleanType === "test") return "test";
+
+  return cleanType || "theory";
 };
 
 const normalizeQuestions = (questions) => {
@@ -142,19 +153,19 @@ const checkPreviousModulesCompleted = async (internId, module) => {
 
   const result = await pool.query(
     `
-    SELECT COUNT(*) AS count
+    SELECT COUNT(*) AS incomplete_count
     FROM training_modules tm
     LEFT JOIN training_progress tp
       ON tp.module_id = tm.id
       AND tp.intern_id = $1
     WHERE tm.course_id = $2
     AND COALESCE(tm.module_order, tm.id) < $3
-    AND LOWER(COALESCE(tp.status, '')) <> 'completed'
+    AND LOWER(COALESCE(tp.status, 'not_started')) <> 'completed'
     `,
     [internId, module.course_id, currentOrder]
   );
 
-  return Number(result.rows[0]?.count || 0) === 0;
+  return Number(result.rows[0]?.incomplete_count || 0) === 0;
 };
 
 const upsertProgress = async ({
@@ -183,7 +194,7 @@ const upsertProgress = async ({
       $2,
       $3,
       $4,
-      $5,
+      $5::jsonb,
       1,
       CASE WHEN $3 = 'completed' THEN CURRENT_TIMESTAMP ELSE NULL END,
       CURRENT_TIMESTAMP
@@ -303,8 +314,14 @@ router.get("/modules", async (req, res) => {
       [courseId ? Number(courseId) : null]
     );
 
+    const modules = result.rows.map((module) => ({
+      ...module,
+      module_type: normalizeModuleType(module.module_type),
+      test_questions: normalizeQuestions(module.test_questions),
+    }));
+
     res.json({
-      modules: result.rows,
+      modules,
     });
   } catch (error) {
     res.status(500).json({
@@ -341,7 +358,7 @@ router.post("/modules", async (req, res) => {
       });
     }
 
-    const cleanModuleType = String(moduleType).trim().toLowerCase();
+    const cleanModuleType = normalizeModuleType(moduleType);
 
     if (!["theory", "video", "test"].includes(cleanModuleType)) {
       return res.status(400).json({
@@ -358,7 +375,7 @@ router.post("/modules", async (req, res) => {
         FROM training_modules
         WHERE course_id = $1
         `,
-        [courseId]
+        [Number(courseId)]
       );
 
       finalOrder = Number(orderResult.rows[0]?.next_order || 1);
@@ -380,7 +397,7 @@ router.post("/modules", async (req, res) => {
         passing_score,
         test_questions
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb)
       RETURNING *
       `,
       [
@@ -410,7 +427,7 @@ router.post("/modules", async (req, res) => {
   }
 });
 
-router.post("/assignments", async (req, res) => {
+const assignTraining = async (req, res) => {
   try {
     const user = await requireLogin(req, res);
     if (!user) return;
@@ -446,14 +463,12 @@ router.post("/assignments", async (req, res) => {
       error: error.message,
     });
   }
-});
+};
 
-router.post("/assign", async (req, res) => {
-  req.url = "/assignments";
-  router.handle(req, res);
-});
+router.post("/assignments", assignTraining);
+router.post("/assign", assignTraining);
 
-router.get("/my", async (req, res) => {
+const getMyTraining = async (req, res) => {
   try {
     const user = await requireLogin(req, res);
     if (!user) return;
@@ -464,7 +479,7 @@ router.get("/my", async (req, res) => {
       });
     }
 
-    const intern = await getInternByUserEmail(user.email);
+    const intern = await getInternByEmail(user.email);
 
     if (!intern) {
       return res.status(404).json({
@@ -525,6 +540,7 @@ router.get("/my", async (req, res) => {
       let canOpenCurrentModule = true;
 
       const modules = modulesResult.rows.map((module) => {
+        const cleanType = normalizeModuleType(module.module_type);
         const isCompleted =
           String(module.progress_status || "").toLowerCase() === "completed";
 
@@ -536,6 +552,7 @@ router.get("/my", async (req, res) => {
 
         return {
           ...module,
+          module_type: cleanType,
           test_questions: normalizeQuestions(module.test_questions),
           is_completed: isCompleted,
           is_locked: isLocked,
@@ -563,7 +580,10 @@ router.get("/my", async (req, res) => {
       error: error.message,
     });
   }
-});
+};
+
+router.get("/my", getMyTraining);
+router.get("/my-training", getMyTraining);
 
 router.post("/modules/:moduleId/complete", async (req, res) => {
   try {
@@ -576,7 +596,7 @@ router.post("/modules/:moduleId/complete", async (req, res) => {
       });
     }
 
-    const intern = await getInternByUserEmail(user.email);
+    const intern = await getInternByEmail(user.email);
 
     if (!intern) {
       return res.status(404).json({
@@ -595,7 +615,7 @@ router.post("/modules/:moduleId/complete", async (req, res) => {
       });
     }
 
-    const moduleType = String(module.module_type || "").toLowerCase();
+    const moduleType = normalizeModuleType(module.module_type);
 
     if (moduleType === "test") {
       return res.status(400).json({
@@ -685,7 +705,7 @@ router.post("/modules/:moduleId/test-submit", async (req, res) => {
       });
     }
 
-    const intern = await getInternByUserEmail(user.email);
+    const intern = await getInternByEmail(user.email);
 
     if (!intern) {
       return res.status(404).json({
@@ -704,7 +724,7 @@ router.post("/modules/:moduleId/test-submit", async (req, res) => {
       });
     }
 
-    const moduleType = String(module.module_type || "").toLowerCase();
+    const moduleType = normalizeModuleType(module.module_type);
 
     if (moduleType !== "test") {
       return res.status(400).json({
@@ -772,7 +792,9 @@ router.post("/modules/:moduleId/test-submit", async (req, res) => {
       }
 
       if (question.correctAnswer !== undefined) {
-        const correctAnswer = String(question.correctAnswer).trim().toLowerCase();
+        const correctAnswer = String(question.correctAnswer)
+          .trim()
+          .toLowerCase();
 
         const selectedOption =
           Array.isArray(question.options) && question.options[userAnswerNumber]
@@ -784,9 +806,7 @@ router.post("/modules/:moduleId/test-submit", async (req, res) => {
         }
       }
 
-      if (isCorrect) {
-        correctCount += 1;
-      }
+      if (isCorrect) correctCount += 1;
     });
 
     const score = Math.round((correctCount / questions.length) * 100);

@@ -2,9 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import api from "../api/api";
-import LoadingState from "./LoadingState";
-import EmptyState from "./EmptyState";
-import ErrorState from "./ErrorState";
 
 function InternTrainingPanel() {
   const [intern, setIntern] = useState(null);
@@ -21,6 +18,16 @@ function InternTrainingPanel() {
   const [errorMessage, setErrorMessage] = useState("");
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState("");
+
+  const normalizeModuleType = (type) => {
+    const cleanType = String(type || "").toLowerCase();
+
+    if (["quiz", "assessment", "exam"].includes(cleanType)) return "test";
+    if (cleanType === "video") return "video";
+    if (cleanType === "test") return "test";
+
+    return "theory";
+  };
 
   const showMessage = (text, type = "success") => {
     setMessage(text);
@@ -41,6 +48,7 @@ function InternTrainingPanel() {
 
       if (loadedCourses.length > 0) {
         const firstCourse = loadedCourses[0];
+
         setSelectedCourseId(String(firstCourse.courseId));
 
         const firstAvailableModule =
@@ -78,9 +86,7 @@ function InternTrainingPanel() {
     );
   }, [selectedCourse, selectedModuleId]);
 
-  const selectedModuleType = String(
-    selectedModule?.module_type || ""
-  ).toLowerCase();
+  const selectedModuleType = normalizeModuleType(selectedModule?.module_type);
 
   const selectedModuleTimer = studyTimers[selectedModule?.id] || 0;
 
@@ -131,8 +137,8 @@ function InternTrainingPanel() {
   ]);
 
   const formatSeconds = (seconds) => {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
+    const minutes = Math.floor(Number(seconds || 0) / 60);
+    const remainingSeconds = Number(seconds || 0) % 60;
 
     return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
   };
@@ -140,6 +146,7 @@ function InternTrainingPanel() {
   const getModuleStatusLabel = (module) => {
     if (module.is_locked) return "Locked";
     if (module.is_completed) return "Completed";
+
     if (String(module.progress_status || "").toLowerCase() === "failed") {
       return "Failed";
     }
@@ -150,6 +157,7 @@ function InternTrainingPanel() {
   const getModuleStatusClass = (module) => {
     if (module.is_locked) return "locked";
     if (module.is_completed) return "completed";
+
     if (String(module.progress_status || "").toLowerCase() === "failed") {
       return "failed";
     }
@@ -161,6 +169,8 @@ function InternTrainingPanel() {
     setSelectedCourseId(String(courseId));
     setTestResult(null);
     setTestAnswers({});
+    setMessage("");
+    setMessageType("");
 
     const course = courses.find(
       (item) => String(item.courseId) === String(courseId)
@@ -191,6 +201,8 @@ function InternTrainingPanel() {
   };
 
   const updateConfirmation = (field, value) => {
+    if (!selectedModule) return;
+
     setConfirmations((prev) => ({
       ...prev,
       [selectedModule.id]: {
@@ -251,7 +263,6 @@ function InternTrainingPanel() {
       );
 
       setTestResult(res.data);
-
       showMessage(res.data.message || "Test submitted.");
 
       if (res.data.passed) {
@@ -268,10 +279,10 @@ function InternTrainingPanel() {
   if (loading) {
     return (
       <section className="panel">
-        <LoadingState
-          title="Loading training"
-          message="Please wait while we load your assigned modules."
-        />
+        <div className="ws6-state-box">
+          <h3>Loading training</h3>
+          <p>Please wait while we load your assigned modules.</p>
+        </div>
       </section>
     );
   }
@@ -279,11 +290,13 @@ function InternTrainingPanel() {
   if (errorMessage) {
     return (
       <section className="panel">
-        <ErrorState
-          title="Training not loaded"
-          message={errorMessage}
-          onRetry={loadTraining}
-        />
+        <div className="ws6-state-box error">
+          <h3>Training not loaded</h3>
+          <p>{errorMessage}</p>
+          <button type="button" className="small-btn" onClick={loadTraining}>
+            Try Again
+          </button>
+        </div>
       </section>
     );
   }
@@ -291,10 +304,10 @@ function InternTrainingPanel() {
   if (courses.length === 0) {
     return (
       <section className="panel">
-        <EmptyState
-          title="No training assigned"
-          message="Your training modules will appear here once HR assigns a course."
-        />
+        <div className="ws6-state-box">
+          <h3>No training assigned</h3>
+          <p>Your training modules will appear here once HR assigns a course.</p>
+        </div>
       </section>
     );
   }
@@ -317,14 +330,14 @@ function InternTrainingPanel() {
         </div>
       )}
 
-      <div className="ws-learning-layout">
-        <aside className="ws-learning-sidebar">
-          <div className="ws-learning-intern">
+      <div className="ws6-learning-layout">
+        <aside className="ws6-learning-sidebar">
+          <div className="ws6-intern-card">
             <strong>{intern?.full_name || "Intern"}</strong>
             <span>{intern?.email}</span>
           </div>
 
-          <label className="ws-course-select">
+          <label className="ws6-course-select">
             Course
             <select
               value={selectedCourseId}
@@ -338,22 +351,22 @@ function InternTrainingPanel() {
             </select>
           </label>
 
-          <div className="ws-module-list">
+          <div className="ws6-module-list">
             {selectedCourse?.modules.map((module, index) => (
               <button
                 type="button"
                 key={module.id}
-                className={`ws-module-item ${
+                className={`ws6-module-item ${
                   String(selectedModuleId) === String(module.id) ? "active" : ""
                 } ${getModuleStatusClass(module)}`}
                 onClick={() => selectModule(module)}
               >
-                <span className="ws-module-number">{index + 1}</span>
+                <span className="ws6-module-number">{index + 1}</span>
 
-                <span className="ws-module-info">
+                <span className="ws6-module-info">
                   <strong>{module.title}</strong>
                   <small>
-                    {String(module.module_type || "").toUpperCase()} •{" "}
+                    {normalizeModuleType(module.module_type).toUpperCase()} •{" "}
                     {getModuleStatusLabel(module)}
                   </small>
                 </span>
@@ -362,38 +375,32 @@ function InternTrainingPanel() {
           </div>
         </aside>
 
-        <div className="ws-learning-content">
+        <div className="ws6-learning-content">
           {!selectedModule && (
-            <EmptyState
-              title="Select a module"
-              message="Choose a module from the left side to start learning."
-            />
+            <div className="ws6-state-box">
+              <h3>Select a module</h3>
+              <p>Choose a module from the left side to start learning.</p>
+            </div>
           )}
 
           {selectedModule && selectedModule.is_locked && (
-            <div className="ws-locked-module">
-              <div className="ws-state-icon">🔒</div>
-              <h3>{selectedModule.title}</h3>
-              <p>
-                This module is locked. Complete all previous modules to unlock
-                it.
-              </p>
+            <div className="ws6-state-box">
+              <h3>Locked Module</h3>
+              <p>Complete all previous modules to unlock this module.</p>
             </div>
           )}
 
           {selectedModule && !selectedModule.is_locked && (
             <>
-              <div className="ws-module-header">
+              <div className="ws6-module-header">
                 <div>
-                  <span className="ws-module-type">
-                    {selectedModuleType || "module"}
-                  </span>
+                  <span className="ws6-module-type">{selectedModuleType}</span>
                   <h3>{selectedModule.title}</h3>
                   <p>{selectedModule.description || "Complete this module."}</p>
                 </div>
 
                 <span
-                  className={`ws-module-status ${getModuleStatusClass(
+                  className={`ws6-module-status ${getModuleStatusClass(
                     selectedModule
                   )}`}
                 >
@@ -402,8 +409,8 @@ function InternTrainingPanel() {
               </div>
 
               {selectedModuleType === "theory" && (
-                <div className="ws-theory-box">
-                  <div className="ws-study-progress">
+                <div className="ws6-theory-box">
+                  <div className="ws6-progress-box">
                     <div>
                       <strong>Study Timer</strong>
                       <span>
@@ -412,12 +419,14 @@ function InternTrainingPanel() {
                       </span>
                     </div>
 
-                    <div className="ws-progress-track">
+                    <div className="ws6-progress-track">
                       <div
-                        className="ws-progress-fill"
+                        className="ws6-progress-fill"
                         style={{
                           width: `${Math.min(
-                            (selectedModuleTimer / requiredStudySeconds) * 100,
+                            (selectedModuleTimer /
+                              Math.max(requiredStudySeconds, 1)) *
+                              100,
                             100
                           )}%`,
                         }}
@@ -425,7 +434,7 @@ function InternTrainingPanel() {
                     </div>
                   </div>
 
-                  <div className="ws-theory-content">
+                  <div className="ws6-theory-content">
                     {(selectedModule.theory_content ||
                       selectedModule.content ||
                       selectedModule.description ||
@@ -436,7 +445,7 @@ function InternTrainingPanel() {
                       ))}
                   </div>
 
-                  <label className="ws-confirm-check">
+                  <label className="ws6-confirm-check">
                     <input
                       type="checkbox"
                       checked={Boolean(confirmation.confirmStudied)}
@@ -468,13 +477,13 @@ function InternTrainingPanel() {
               )}
 
               {selectedModuleType === "video" && (
-                <div className="ws-video-box">
+                <div className="ws6-video-box">
                   {selectedModule.video_url ? (
                     <a
                       href={selectedModule.video_url}
                       target="_blank"
                       rel="noreferrer"
-                      className="ws-video-link"
+                      className="ws6-video-link"
                     >
                       Open Training Video
                     </a>
@@ -482,7 +491,7 @@ function InternTrainingPanel() {
                     <p>No video link added for this module.</p>
                   )}
 
-                  <label className="ws-confirm-check">
+                  <label className="ws6-confirm-check">
                     <input
                       type="checkbox"
                       checked={Boolean(confirmation.confirmWatched)}
@@ -510,8 +519,8 @@ function InternTrainingPanel() {
               )}
 
               {selectedModuleType === "test" && (
-                <div className="ws-test-box">
-                  <div className="ws-test-progress">
+                <div className="ws6-test-box">
+                  <div className="ws6-progress-box">
                     <div>
                       <strong>Test Progress</strong>
                       <span>
@@ -519,34 +528,34 @@ function InternTrainingPanel() {
                       </span>
                     </div>
 
-                    <div className="ws-progress-track">
+                    <div className="ws6-progress-track">
                       <div
-                        className="ws-progress-fill"
+                        className="ws6-progress-fill"
                         style={{ width: `${testProgress}%` }}
                       ></div>
                     </div>
                   </div>
 
                   {questions.length === 0 && (
-                    <EmptyState
-                      title="No questions added"
-                      message="This test has no questions. Submit to complete it."
-                    />
+                    <div className="ws6-state-box">
+                      <h3>No questions added</h3>
+                      <p>This test has no questions. Submit to complete it.</p>
+                    </div>
                   )}
 
                   {questions.map((question, questionIndex) => (
-                    <div className="ws-question-card" key={questionIndex}>
-                      <div className="ws-question-top">
+                    <div className="ws6-question-card" key={questionIndex}>
+                      <div className="ws6-question-top">
                         <span>
                           Question {questionIndex + 1} of {questions.length}
                         </span>
                         <strong>{question.question}</strong>
                       </div>
 
-                      <div className="ws-option-list">
+                      <div className="ws6-option-list">
                         {(question.options || []).map((option, optionIndex) => (
                           <label
-                            className={`ws-option-card ${
+                            className={`ws6-option-card ${
                               Number(testAnswers[questionIndex]) === optionIndex
                                 ? "selected"
                                 : ""
@@ -573,7 +582,7 @@ function InternTrainingPanel() {
 
                   {testResult && (
                     <div
-                      className={`ws-test-result ${
+                      className={`ws6-test-result ${
                         testResult.passed ? "passed" : "failed"
                       }`}
                     >
