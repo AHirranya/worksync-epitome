@@ -6273,3 +6273,226 @@ tbody tr:hover {
     grid-template-columns: 1fr;
   }
 }
+/* ============================= */
+/* Admin Dashboard Spacing Fix */
+/* ============================= */
+
+.admin-dashboard,
+.admin-page,
+.dashboard-page,
+.admin-dashboard-page {
+  width: min(1180px, calc(100% - 32px));
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 110px 0 70px;
+}
+
+.admin-dashboard section,
+.admin-page section,
+.dashboard-page section,
+.admin-card,
+.dashboard-card,
+.report-card,
+.reports-card,
+.analytics-card,
+.audit-card,
+.audit-section,
+.audit-logs-section {
+  width: 100%;
+  max-width: 100%;
+  padding: 24px;
+  border-radius: 22px;
+}
+
+.reports-section,
+.report-section,
+.analytics-section,
+.audit-section,
+.audit-logs-section,
+.reports-card,
+.analytics-card,
+.audit-card {
+  margin-top: 26px;
+  background: #070707;
+  border: 1px solid rgba(255, 122, 0, 0.28);
+}
+
+.reports-section h2,
+.report-section h2,
+.analytics-section h2,
+.audit-section h2,
+.audit-logs-section h2,
+.reports-card h2,
+.analytics-card h2,
+.audit-card h2 {
+  font-size: 24px;
+  line-height: 1.25;
+  margin-bottom: 10px;
+}
+
+.reports-section p,
+.report-section p,
+.analytics-section p,
+.audit-section p,
+.audit-logs-section p,
+.reports-card p,
+.analytics-card p,
+.audit-card p {
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.reports-grid,
+.analytics-grid,
+.audit-stats,
+.audit-summary,
+.dashboard-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin: 18px 0;
+}
+
+.report-list,
+.analytics-list,
+.audit-list,
+.logs-list {
+  display: grid;
+  gap: 12px;
+}
+
+.report-item,
+.analytics-item,
+.audit-item,
+.log-item {
+  background: #101010;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 16px;
+}
+
+.report-item h3,
+.analytics-item h3,
+.audit-item h3,
+.log-item h3 {
+  font-size: 17px;
+  margin-bottom: 6px;
+}
+
+.report-item p,
+.analytics-item p,
+.audit-item p,
+.log-item p {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #d8d8d8;
+}
+
+.audit-filters,
+.audit-controls,
+.filter-row,
+.search-row {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr auto auto;
+  gap: 12px;
+  align-items: end;
+  margin-top: 18px;
+}
+
+.audit-filters input,
+.audit-filters select,
+.audit-controls input,
+.audit-controls select,
+.filter-row input,
+.filter-row select,
+.search-row input,
+.search-row select {
+  min-height: 44px;
+  width: 100%;
+  background: #111111;
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  padding: 10px 12px;
+  outline: none;
+}
+
+.audit-filters button,
+.audit-controls button,
+.filter-row button,
+.search-row button {
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 12px;
+  border: none;
+  background: #ff7a00;
+  color: #000000;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.admin-dashboard table,
+.admin-page table,
+.dashboard-page table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: auto;
+}
+
+.admin-dashboard th,
+.admin-dashboard td,
+.admin-page th,
+.admin-page td,
+.dashboard-page th,
+.dashboard-page td {
+  padding: 14px 12px;
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: normal;
+}
+
+.admin-dashboard th,
+.admin-page th,
+.dashboard-page th {
+  color: #ff7a00;
+  font-weight: 900;
+}
+
+@media (max-width: 900px) {
+  .admin-dashboard,
+  .admin-page,
+  .dashboard-page,
+  .admin-dashboard-page {
+    width: min(100% - 24px, 100%);
+    padding-top: 95px;
+  }
+
+  .reports-grid,
+  .analytics-grid,
+  .audit-stats,
+  .audit-summary,
+  .dashboard-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .audit-filters,
+  .audit-controls,
+  .filter-row,
+  .search-row {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-dashboard section,
+  .admin-page section,
+  .dashboard-page section,
+  .admin-card,
+  .dashboard-card,
+  .report-card,
+  .reports-card,
+  .analytics-card,
+  .audit-card,
+  .audit-section,
+  .audit-logs-section {
+    padding: 18px;
+  }
+}
