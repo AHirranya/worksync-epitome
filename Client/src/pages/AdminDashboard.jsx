@@ -1,660 +1,473 @@
-// Client/src/pages/AdminDashboard.jsx
-
 import { useEffect, useMemo, useState } from "react";
 import api from "../api/api";
 
-import LoadingState from "../components/LoadingState";
-import EmptyState from "../components/EmptyState";
-import ErrorState from "../components/ErrorState";
-import ReportsPanel from "../components/ReportsPanel";
-import AdminAuditPanel from "../components/AdminAuditPanel";
-
 function AdminDashboard() {
+  const [summary, setSummary] = useState(null);
   const [users, setUsers] = useState([]);
   const [departments, setDepartments] = useState([]);
-
-  const [usersLoading, setUsersLoading] = useState(true);
-  const [departmentsLoading, setDepartmentsLoading] = useState(true);
-
-  const [usersError, setUsersError] = useState("");
-  const [departmentsError, setDepartmentsError] = useState("");
-
-  const [userSearch, setUserSearch] = useState("");
-  const [roleFilter, setRoleFilter] = useState("all");
-  const [departmentSearch, setDepartmentSearch] = useState("");
-
-  const [userForm, setUserForm] = useState({
-    fullName: "",
-    email: "",
-    password: "",
-    role: "hr",
-  });
-
-  const [departmentForm, setDepartmentForm] = useState({
-    name: "",
-    code: "",
-  });
-
-  const [generatedPassword, setGeneratedPassword] = useState("");
+  const [reports, setReports] = useState(null);
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
-  const [messageType, setMessageType] = useState("");
 
-  const showMessage = (text, type = "success") => {
-    setMessage(text);
-    setMessageType(type);
-  };
+  const [activeTab, setActiveTab] = useState("overview");
 
-  const loadUsers = async () => {
+  const loadAdminData = async () => {
     try {
-      setUsersLoading(true);
-      setUsersError("");
+      setLoading(true);
+      setMessage("");
 
-      const res = await api.get("/admin/users");
-      setUsers(res.data.users || []);
+      const [summaryRes, usersRes, departmentRes, reportsRes, auditRes] =
+        await Promise.allSettled([
+          api.get("/admin/summary"),
+          api.get("/admin/users"),
+          api.get("/admin/departments"),
+          api.get("/reports"),
+          api.get("/audit"),
+        ]);
+
+      if (summaryRes.status === "fulfilled") {
+        setSummary(summaryRes.value.data?.summary || null);
+      }
+
+      if (usersRes.status === "fulfilled") {
+        setUsers(usersRes.value.data?.users || []);
+      }
+
+      if (departmentRes.status === "fulfilled") {
+        setDepartments(departmentRes.value.data?.departments || []);
+      }
+
+      if (reportsRes.status === "fulfilled") {
+        setReports(reportsRes.value.data || null);
+      }
+
+      if (auditRes.status === "fulfilled") {
+        const data = auditRes.value.data;
+        setAuditLogs(data?.logs || data?.auditLogs || data?.audits || []);
+      }
     } catch (error) {
-      setUsersError(error.response?.data?.message || "Failed to load users.");
+      setMessage(
+        error.response?.data?.message || "Failed to load admin dashboard."
+      );
     } finally {
-      setUsersLoading(false);
+      setLoading(false);
     }
-  };
-
-  const loadDepartments = async () => {
-    try {
-      setDepartmentsLoading(true);
-      setDepartmentsError("");
-
-      const res = await api.get("/admin/departments");
-      setDepartments(res.data.departments || []);
-    } catch (error) {
-      setDepartmentsError(
-        error.response?.data?.message || "Failed to load departments."
-      );
-    } finally {
-      setDepartmentsLoading(false);
-    }
-  };
-
-  const loadData = async () => {
-    await Promise.all([loadUsers(), loadDepartments()]);
-  };
-
-  const filteredUsers = useMemo(() => {
-    const searchText = userSearch.trim().toLowerCase();
-
-    return users.filter((item) => {
-      const name = String(item.full_name || item.fullName || "").toLowerCase();
-      const email = String(item.email || "").toLowerCase();
-      const role = String(item.role || "").toLowerCase();
-
-      const matchesSearch =
-        !searchText || name.includes(searchText) || email.includes(searchText);
-
-      const matchesRole = roleFilter === "all" || role === roleFilter;
-
-      return matchesSearch && matchesRole;
-    });
-  }, [users, userSearch, roleFilter]);
-
-  const filteredDepartments = useMemo(() => {
-    const searchText = departmentSearch.trim().toLowerCase();
-
-    return departments.filter((dept) => {
-      const name = String(dept.name || "").toLowerCase();
-      const code = String(dept.code || "").toLowerCase();
-
-      return !searchText || name.includes(searchText) || code.includes(searchText);
-    });
-  }, [departments, departmentSearch]);
-
-  const updateUserForm = (e) => {
-    setUserForm({
-      ...userForm,
-      [e.target.name]: e.target.value,
-    });
-  };
-
-  const updateDepartmentForm = (e) => {
-    setDepartmentForm({
-      ...departmentForm,
-      [e.target.name]: e.target.value,
-    });
-  };
-
-  const createUser = async (e) => {
-    e.preventDefault();
-
-    setGeneratedPassword("");
-    setMessage("");
-    setMessageType("");
-
-    try {
-      const res = await api.post("/admin/users", userForm);
-
-      showMessage(res.data.message || "User created successfully.");
-
-      setGeneratedPassword(
-        res.data.generatedPassword ||
-          res.data.password ||
-          userForm.password ||
-          ""
-      );
-
-      setUserForm({
-        fullName: "",
-        email: "",
-        password: "",
-        role: "hr",
-      });
-
-      await loadUsers();
-    } catch (error) {
-      showMessage(
-        error.response?.data?.message || "Failed to create user.",
-        "error"
-      );
-    }
-  };
-
-  const updateUserRole = async (userId, role) => {
-    try {
-      const res = await api.patch(`/admin/users/${userId}/role`, {
-        role,
-      });
-
-      showMessage(res.data.message || "User role updated successfully.");
-      await loadUsers();
-    } catch (error) {
-      showMessage(
-        error.response?.data?.message || "Failed to update user role.",
-        "error"
-      );
-    }
-  };
-
-  const resetPassword = async (userId) => {
-    try {
-      const res = await api.patch(`/admin/users/${userId}/reset-password`);
-
-      showMessage(res.data.message || "Password reset successfully.");
-
-      setGeneratedPassword(
-        res.data.generatedPassword || res.data.password || ""
-      );
-
-      await loadUsers();
-    } catch (error) {
-      showMessage(
-        error.response?.data?.message || "Failed to reset password.",
-        "error"
-      );
-    }
-  };
-
-  const deleteUser = async (userId) => {
-    const confirmDelete = window.confirm(
-      "Are you sure you want to delete this user?"
-    );
-
-    if (!confirmDelete) return;
-
-    try {
-      const res = await api.delete(`/admin/users/${userId}`);
-
-      showMessage(res.data.message || "User deleted successfully.");
-      await loadUsers();
-    } catch (error) {
-      showMessage(
-        error.response?.data?.message || "Failed to delete user.",
-        "error"
-      );
-    }
-  };
-
-  const createDepartment = async (e) => {
-    e.preventDefault();
-
-    setMessage("");
-    setMessageType("");
-
-    try {
-      const res = await api.post("/admin/departments", departmentForm);
-
-      showMessage(res.data.message || "Department created successfully.");
-
-      setDepartmentForm({
-        name: "",
-        code: "",
-      });
-
-      await loadDepartments();
-    } catch (error) {
-      showMessage(
-        error.response?.data?.message || "Failed to create department.",
-        "error"
-      );
-    }
-  };
-
-  const deleteDepartment = async (departmentId) => {
-    const confirmDelete = window.confirm(
-      "Are you sure you want to delete this department?"
-    );
-
-    if (!confirmDelete) return;
-
-    try {
-      const res = await api.delete(`/admin/departments/${departmentId}`);
-
-      showMessage(res.data.message || "Department deleted successfully.");
-      await loadDepartments();
-    } catch (error) {
-      showMessage(
-        error.response?.data?.message || "Failed to delete department.",
-        "error"
-      );
-    }
-  };
-
-  const clearUserFilters = () => {
-    setUserSearch("");
-    setRoleFilter("all");
-  };
-
-  const clearDepartmentFilters = () => {
-    setDepartmentSearch("");
   };
 
   useEffect(() => {
-    loadData();
+    loadAdminData();
   }, []);
 
+  const roleCounts = useMemo(() => {
+    return users.reduce(
+      (acc, user) => {
+        const role = String(user.role || "").toLowerCase();
+
+        if (role === "admin") acc.admin += 1;
+        if (role === "hr") acc.hr += 1;
+        if (role === "mentor") acc.mentor += 1;
+        if (role === "intern") acc.intern += 1;
+
+        return acc;
+      },
+      {
+        admin: 0,
+        hr: 0,
+        mentor: 0,
+        intern: 0,
+      }
+    );
+  }, [users]);
+
+  const reportCards = [
+    {
+      title: "Total Users",
+      value: summary?.totalUsers ?? users.length,
+      description: "All registered platform users",
+    },
+    {
+      title: "Total Interns",
+      value: summary?.totalInterns ?? roleCounts.intern,
+      description: "Active and onboarded interns",
+    },
+    {
+      title: "Departments",
+      value: summary?.totalDepartments ?? departments.length,
+      description: "Available departments",
+    },
+    {
+      title: "Certificates",
+      value: summary?.certificatesIssued ?? 0,
+      description: "Issued certificates",
+    },
+    {
+      title: "Work Logs",
+      value: summary?.workLogs ?? reports?.summary?.workLogs ?? 0,
+      description: "Submitted work logs",
+    },
+    {
+      title: "Attendance",
+      value: summary?.attendanceRecords ?? reports?.summary?.attendance ?? 0,
+      description: "Attendance entries",
+    },
+  ];
+
+  const departmentStats = departments.map((department) => {
+    const count = users.filter((user) => {
+      const dept = String(user.department_name || user.department || "")
+        .trim()
+        .toLowerCase();
+
+      return dept === String(department.name || "").trim().toLowerCase();
+    }).length;
+
+    return {
+      id: department.id,
+      name: department.name,
+      code: department.code,
+      count,
+    };
+  });
+
   return (
-    <main className="dashboard-page">
-      <section className="dashboard-header">
-        <h1>Admin Dashboard</h1>
-        <p>
-          Manage platform users, user roles, departments, reports, and complete
-          WorkSync system access.
-        </p>
-      </section>
-
-      {message && (
-        <section className="panel">
-          <div
-            className={`message-box ${messageType === "error" ? "error" : ""}`}
-          >
-            {message}
-          </div>
-
-          {generatedPassword && (
-            <div className="ws-highlight-box">
-              <strong>Generated Password:</strong>
-              <p>{generatedPassword}</p>
-            </div>
-          )}
-        </section>
-      )}
-
-      <section className="panel">
-        <div className="panel-heading-row">
-          <div>
-            <h2>Create Platform User</h2>
-            <p>
-              Create Admin, HR, Mentor, Intern, or Applicant/User accounts from
-              one place.
-            </p>
-          </div>
+    <main className="admin-pro-page">
+      <section className="admin-pro-hero">
+        <div>
+          <p className="admin-pro-kicker">Admin Control Center</p>
+          <h1>Admin Dashboard</h1>
+          <span>
+            Manage users, departments, reports, certificates, work logs,
+            attendance, and audit activity in one clean dashboard.
+          </span>
         </div>
 
-        <form className="form-grid" onSubmit={createUser}>
-          <label>
-            Full Name
-            <input
-              type="text"
-              name="fullName"
-              value={userForm.fullName}
-              onChange={updateUserForm}
-              placeholder="Enter full name"
-              required
-            />
-          </label>
-
-          <label>
-            Email
-            <input
-              type="email"
-              name="email"
-              value={userForm.email}
-              onChange={updateUserForm}
-              placeholder="Enter email address"
-              required
-            />
-          </label>
-
-          <label>
-            Password
-            <input
-              type="text"
-              name="password"
-              value={userForm.password}
-              onChange={updateUserForm}
-              placeholder="Example: 123456"
-              required
-            />
-          </label>
-
-          <label>
-            Role
-            <select
-              name="role"
-              value={userForm.role}
-              onChange={updateUserForm}
-              required
-            >
-              <option value="admin">Admin</option>
-              <option value="hr">HR</option>
-              <option value="mentor">Mentor</option>
-              <option value="intern">Intern</option>
-              <option value="user">Applicant / User</option>
-            </select>
-          </label>
-
-          <div className="form-grid-full">
-            <button type="submit">Create User</button>
-          </div>
-        </form>
+        <button
+          type="button"
+          className="admin-refresh-btn"
+          onClick={loadAdminData}
+          disabled={loading}
+        >
+          {loading ? "Refreshing..." : "Refresh"}
+        </button>
       </section>
 
-      <section className="panel">
-        <div className="panel-heading-row">
-          <div>
-            <h2>Users & Roles</h2>
-            <p>Search users by name/email and filter by role.</p>
-          </div>
+      {message && <div className="admin-message">{message}</div>}
 
+      <section className="admin-pro-stats">
+        <StatCard
+          label="Total Users"
+          value={summary?.totalUsers ?? users.length}
+          note="All users"
+        />
+        <StatCard label="Admins" value={summary?.totalAdmins ?? roleCounts.admin} note="System access" />
+        <StatCard label="HR" value={summary?.totalHRs ?? roleCounts.hr} note="Onboarding team" />
+        <StatCard label="Mentors" value={summary?.totalMentors ?? roleCounts.mentor} note="Intern guides" />
+        <StatCard label="Interns" value={summary?.totalInterns ?? roleCounts.intern} note="Learners" />
+        <StatCard
+          label="Departments"
+          value={summary?.totalDepartments ?? departments.length}
+          note="Training groups"
+        />
+      </section>
+
+      <section className="admin-tabs">
+        {[
+          ["overview", "Overview"],
+          ["users", "Users"],
+          ["departments", "Departments"],
+          ["reports", "Reports"],
+          ["audit", "Audit Logs"],
+        ].map(([key, label]) => (
           <button
             type="button"
-            className="outline-small-btn"
-            onClick={loadUsers}
+            key={key}
+            className={activeTab === key ? "active" : ""}
+            onClick={() => setActiveTab(key)}
           >
-            Refresh
+            {label}
           </button>
-        </div>
-
-        <div className="ws-filter-bar">
-          <div className="ws-filter-field">
-            <label>Search Users</label>
-            <input
-              type="text"
-              value={userSearch}
-              onChange={(e) => setUserSearch(e.target.value)}
-              placeholder="Search by name or email"
-            />
-          </div>
-
-          <div className="ws-filter-field">
-            <label>Role</label>
-            <select
-              value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value)}
-            >
-              <option value="all">All Roles</option>
-              <option value="admin">Admin</option>
-              <option value="hr">HR</option>
-              <option value="mentor">Mentor</option>
-              <option value="intern">Intern</option>
-              <option value="user">Applicant / User</option>
-            </select>
-          </div>
-
-          <div className="ws-filter-actions">
-            <button
-              type="button"
-              className="outline-small-btn"
-              onClick={clearUserFilters}
-            >
-              Clear
-            </button>
-          </div>
-        </div>
-
-        <p className="ws-result-count">
-          Showing {filteredUsers.length} of {users.length} users
-        </p>
-
-        {usersLoading && <LoadingState type="table" />}
-
-        {!usersLoading && usersError && (
-          <ErrorState
-            title="Users not loaded"
-            message={usersError}
-            onRetry={loadUsers}
-          />
-        )}
-
-        {!usersLoading && !usersError && users.length === 0 && (
-          <EmptyState
-            title="No users found"
-            message="Created platform users will appear here."
-          />
-        )}
-
-        {!usersLoading &&
-          !usersError &&
-          users.length > 0 &&
-          filteredUsers.length === 0 && (
-            <EmptyState
-              title="No matching users"
-              message="Try changing the search text or role filter."
-            />
-          )}
-
-        {!usersLoading && !usersError && filteredUsers.length > 0 && (
-          <div className="table-wrapper">
-            <table>
-              <thead>
-                <tr>
-                  <th>User</th>
-                  <th>Email</th>
-                  <th>Role</th>
-                  <th>Change Role</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {filteredUsers.map((item) => (
-                  <tr key={item.id}>
-                    <td>{item.full_name || item.fullName || "-"}</td>
-                    <td>{item.email}</td>
-                    <td>
-                      <span className="status selected">{item.role}</span>
-                    </td>
-                    <td>
-                      <select
-                        value={item.role}
-                        onChange={(e) =>
-                          updateUserRole(item.id, e.target.value)
-                        }
-                      >
-                        <option value="admin">Admin</option>
-                        <option value="hr">HR</option>
-                        <option value="mentor">Mentor</option>
-                        <option value="intern">Intern</option>
-                        <option value="user">Applicant / User</option>
-                      </select>
-                    </td>
-                    <td>
-                      <div className="task-action-row">
-                        <button
-                          type="button"
-                          className="small-btn"
-                          onClick={() => resetPassword(item.id)}
-                        >
-                          Reset Password
-                        </button>
-
-                        <button
-                          type="button"
-                          className="outline-small-btn"
-                          onClick={() => deleteUser(item.id)}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        ))}
       </section>
 
-      <section className="panel">
-        <div className="panel-heading-row">
-          <div>
-            <h2>Department Management</h2>
-            <p>Create, search, and manage departments used during onboarding.</p>
-          </div>
-        </div>
-
-        <form className="form-grid" onSubmit={createDepartment}>
-          <label>
-            Department Name
-            <input
-              type="text"
-              name="name"
-              value={departmentForm.name}
-              onChange={updateDepartmentForm}
-              placeholder="Example: Web Development"
-              required
+      {activeTab === "overview" && (
+        <section className="admin-pro-grid">
+          <div className="admin-panel large">
+            <PanelHeader
+              title="Role Distribution"
+              subtitle="Users separated by platform roles"
             />
-          </label>
 
-          <label>
-            Department Code
-            <input
-              type="text"
-              name="code"
-              value={departmentForm.code}
-              onChange={updateDepartmentForm}
-              placeholder="Example: WD"
-              required
-            />
-          </label>
-
-          <div className="form-grid-full">
-            <button type="submit">Create Department</button>
-          </div>
-        </form>
-
-        <h3 className="section-subtitle">Departments</h3>
-
-        <div className="ws-filter-bar">
-          <div className="ws-filter-field ws-filter-wide">
-            <label>Search Departments</label>
-            <input
-              type="text"
-              value={departmentSearch}
-              onChange={(e) => setDepartmentSearch(e.target.value)}
-              placeholder="Search by department name or code"
-            />
+            <div className="role-list">
+              <RoleRow label="Admin" count={roleCounts.admin} />
+              <RoleRow label="HR" count={roleCounts.hr} />
+              <RoleRow label="Mentor" count={roleCounts.mentor} />
+              <RoleRow label="Intern" count={roleCounts.intern} />
+            </div>
           </div>
 
-          <div className="ws-filter-actions">
-            <button
-              type="button"
-              className="outline-small-btn"
-              onClick={clearDepartmentFilters}
-            >
-              Clear
-            </button>
-          </div>
-        </div>
-
-        <p className="ws-result-count">
-          Showing {filteredDepartments.length} of {departments.length}{" "}
-          departments
-        </p>
-
-        {departmentsLoading && <LoadingState type="table" />}
-
-        {!departmentsLoading && departmentsError && (
-          <ErrorState
-            title="Departments not loaded"
-            message={departmentsError}
-            onRetry={loadDepartments}
-          />
-        )}
-
-        {!departmentsLoading && !departmentsError && departments.length === 0 && (
-          <EmptyState
-            title="No departments found"
-            message="Departments created by admin will appear here."
-          />
-        )}
-
-        {!departmentsLoading &&
-          !departmentsError &&
-          departments.length > 0 &&
-          filteredDepartments.length === 0 && (
-            <EmptyState
-              title="No matching departments"
-              message="Try changing the search text."
+          <div className="admin-panel">
+            <PanelHeader
+              title="Certificate Rule"
+              subtitle="Current eligibility rule"
             />
-          )}
 
-        {!departmentsLoading &&
-          !departmentsError &&
-          filteredDepartments.length > 0 && (
-            <div className="table-wrapper">
-              <table>
+            <div className="rule-box">
+              {summary?.certificateRule ||
+                "75% theory/video training completion"}
+            </div>
+          </div>
+
+          <div className="admin-panel full">
+            <PanelHeader
+              title="Recent Users"
+              subtitle="Latest user accounts"
+            />
+
+            <div className="admin-table-wrap">
+              <table className="admin-pro-table">
                 <thead>
                   <tr>
-                    <th>Department</th>
-                    <th>Code</th>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Role</th>
                     <th>Created</th>
-                    <th>Action</th>
                   </tr>
                 </thead>
-
                 <tbody>
-                  {filteredDepartments.map((dept) => (
-                    <tr key={dept.id}>
-                      <td>{dept.name}</td>
+                  {users.slice(0, 8).map((user) => (
+                    <tr key={user.id}>
+                      <td>{user.full_name || user.fullName || "-"}</td>
+                      <td>{user.email || "-"}</td>
                       <td>
-                        <span className="status info">{dept.code}</span>
+                        <span className="role-pill">{user.role || "-"}</span>
                       </td>
-                      <td>
-                        {dept.created_at
-                          ? new Date(dept.created_at).toLocaleDateString(
-                              "en-IN"
-                            )
-                          : "-"}
-                      </td>
-                      <td>
-                        <button
-                          type="button"
-                          className="outline-small-btn"
-                          onClick={() => deleteDepartment(dept.id)}
-                        >
-                          Delete
-                        </button>
-                      </td>
+                      <td>{formatDate(user.created_at || user.createdAt)}</td>
                     </tr>
                   ))}
+
+                  {users.length === 0 && (
+                    <tr>
+                      <td colSpan="4">No users found.</td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
-          )}
-      </section>
+          </div>
+        </section>
+      )}
 
-      <ReportsPanel />
+      {activeTab === "users" && (
+        <section className="admin-panel full">
+          <PanelHeader
+            title="Users"
+            subtitle="All registered users in the system"
+          />
 
-      <AdminAuditPanel />
+          <div className="admin-table-wrap">
+            <table className="admin-pro-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Full Name</th>
+                  <th>Email</th>
+                  <th>Role</th>
+                  <th>Created</th>
+                </tr>
+              </thead>
+              <tbody>
+                {users.map((user) => (
+                  <tr key={user.id}>
+                    <td>{user.id}</td>
+                    <td>{user.full_name || user.fullName || "-"}</td>
+                    <td>{user.email || "-"}</td>
+                    <td>
+                      <span className="role-pill">{user.role || "-"}</span>
+                    </td>
+                    <td>{formatDate(user.created_at || user.createdAt)}</td>
+                  </tr>
+                ))}
+
+                {users.length === 0 && (
+                  <tr>
+                    <td colSpan="5">No users found.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {activeTab === "departments" && (
+        <section className="admin-panel full">
+          <PanelHeader
+            title="Departments"
+            subtitle="Department-wise intern and training structure"
+          />
+
+          <div className="department-grid">
+            {departmentStats.map((department) => (
+              <div className="department-card" key={department.id}>
+                <div>
+                  <h3>{department.name}</h3>
+                  <p>{department.code || "NO CODE"}</p>
+                </div>
+                <strong>{department.count}</strong>
+              </div>
+            ))}
+
+            {departmentStats.length === 0 && (
+              <div className="empty-state">No departments found.</div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {activeTab === "reports" && (
+        <section className="admin-panel full">
+          <PanelHeader
+            title="Reports & Analytics"
+            subtitle="System overview from recruitment, onboarding, training, attendance, work logs, certificates, and performance"
+          />
+
+          <div className="report-card-grid">
+            {reportCards.map((item) => (
+              <div className="report-pro-card" key={item.title}>
+                <p>{item.title}</p>
+                <h3>{item.value}</h3>
+                <span>{item.description}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="admin-report-section">
+            <h3>Training Completion</h3>
+            <p>
+              Overall completion of assigned training modules across interns.
+            </p>
+
+            <div className="progress-line">
+              <div
+                style={{
+                  width: `${Number(reports?.summary?.trainingCompletion || 0)}%`,
+                }}
+              />
+            </div>
+
+            <strong>{Number(reports?.summary?.trainingCompletion || 0)}%</strong>
+          </div>
+
+          <div className="admin-report-section">
+            <h3>Department-wise Intern Count</h3>
+
+            <div className="department-report-list">
+              {departmentStats.map((department) => (
+                <div key={department.id}>
+                  <span>{department.name}</span>
+                  <strong>{department.count}</strong>
+                </div>
+              ))}
+
+              {departmentStats.length === 0 && <p>No department data.</p>}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {activeTab === "audit" && (
+        <section className="admin-panel full">
+          <PanelHeader
+            title="Audit Logs"
+            subtitle="Important system actions such as onboarding, certificates, attendance, training, and admin changes"
+          />
+
+          <div className="audit-summary-grid">
+            <div>
+              <p>Total Loaded Logs</p>
+              <h3>{auditLogs.length}</h3>
+            </div>
+            <div>
+              <p>Today's Logs</p>
+              <h3>{countTodayLogs(auditLogs)}</h3>
+            </div>
+            <div>
+              <p>Action Types</p>
+              <h3>{new Set(auditLogs.map((item) => item.action)).size}</h3>
+            </div>
+          </div>
+
+          <div className="audit-log-list">
+            {auditLogs.slice(0, 20).map((log, index) => (
+              <div className="audit-log-item" key={log.id || index}>
+                <div>
+                  <h4>{log.action || log.event || "System Action"}</h4>
+                  <p>{log.description || log.message || "No description"}</p>
+                </div>
+                <span>{formatDate(log.created_at || log.createdAt)}</span>
+              </div>
+            ))}
+
+            {auditLogs.length === 0 && (
+              <div className="empty-state">
+                No audit logs returned from backend.
+              </div>
+            )}
+          </div>
+        </section>
+      )}
     </main>
   );
+}
+
+function StatCard({ label, value, note }) {
+  return (
+    <div className="admin-stat-card">
+      <p>{label}</p>
+      <h2>{value}</h2>
+      <span>{note}</span>
+    </div>
+  );
+}
+
+function PanelHeader({ title, subtitle }) {
+  return (
+    <div className="panel-header">
+      <div>
+        <h2>{title}</h2>
+        <p>{subtitle}</p>
+      </div>
+    </div>
+  );
+}
+
+function RoleRow({ label, count }) {
+  return (
+    <div className="role-row">
+      <span>{label}</span>
+      <strong>{count}</strong>
+    </div>
+  );
+}
+
+function formatDate(value) {
+  if (!value) return "-";
+
+  try {
+    return new Date(value).toLocaleDateString("en-IN");
+  } catch (error) {
+    return String(value).slice(0, 10);
+  }
+}
+
+function countTodayLogs(logs) {
+  const today = new Date().toISOString().slice(0, 10);
+
+  return logs.filter((item) => {
+    const value = item.created_at || item.createdAt;
+    return value && String(value).slice(0, 10) === today;
+  }).length;
 }
 
 export default AdminDashboard;
