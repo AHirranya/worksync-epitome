@@ -6,24 +6,34 @@ function AdminDashboard() {
   const [users, setUsers] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [reports, setReports] = useState(null);
-  const [auditLogs, setAuditLogs] = useState([]);
+
+  const [activeTab, setActiveTab] = useState("overview");
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
 
-  const [activeTab, setActiveTab] = useState("overview");
+  const [userForm, setUserForm] = useState({
+    fullName: "",
+    email: "",
+    password: "",
+    role: "intern",
+  });
+
+  const [departmentForm, setDepartmentForm] = useState({
+    name: "",
+    code: "",
+  });
 
   const loadAdminData = async () => {
     try {
       setLoading(true);
       setMessage("");
 
-      const [summaryRes, usersRes, departmentRes, reportsRes, auditRes] =
+      const [summaryRes, usersRes, departmentsRes, reportsRes] =
         await Promise.allSettled([
           api.get("/admin/summary"),
           api.get("/admin/users"),
           api.get("/admin/departments"),
           api.get("/reports"),
-          api.get("/audit"),
         ]);
 
       if (summaryRes.status === "fulfilled") {
@@ -34,17 +44,12 @@ function AdminDashboard() {
         setUsers(usersRes.value.data?.users || []);
       }
 
-      if (departmentRes.status === "fulfilled") {
-        setDepartments(departmentRes.value.data?.departments || []);
+      if (departmentsRes.status === "fulfilled") {
+        setDepartments(departmentsRes.value.data?.departments || []);
       }
 
       if (reportsRes.status === "fulfilled") {
         setReports(reportsRes.value.data || null);
-      }
-
-      if (auditRes.status === "fulfilled") {
-        const data = auditRes.value.data;
-        setAuditLogs(data?.logs || data?.auditLogs || data?.audits || []);
       }
     } catch (error) {
       setMessage(
@@ -80,340 +85,403 @@ function AdminDashboard() {
     );
   }, [users]);
 
-  const reportCards = [
-    {
-      title: "Total Users",
-      value: summary?.totalUsers ?? users.length,
-      description: "All registered platform users",
-    },
-    {
-      title: "Total Interns",
-      value: summary?.totalInterns ?? roleCounts.intern,
-      description: "Active and onboarded interns",
-    },
-    {
-      title: "Departments",
-      value: summary?.totalDepartments ?? departments.length,
-      description: "Available departments",
-    },
-    {
-      title: "Certificates",
-      value: summary?.certificatesIssued ?? 0,
-      description: "Issued certificates",
-    },
-    {
-      title: "Work Logs",
-      value: summary?.workLogs ?? reports?.summary?.workLogs ?? 0,
-      description: "Submitted work logs",
-    },
-    {
-      title: "Attendance",
-      value: summary?.attendanceRecords ?? reports?.summary?.attendance ?? 0,
-      description: "Attendance entries",
-    },
-  ];
+  const handleUserInput = (event) => {
+    const { name, value } = event.target;
 
-  const departmentStats = departments.map((department) => {
-    const count = users.filter((user) => {
-      const dept = String(user.department_name || user.department || "")
-        .trim()
-        .toLowerCase();
+    setUserForm((previous) => ({
+      ...previous,
+      [name]: value,
+    }));
+  };
 
-      return dept === String(department.name || "").trim().toLowerCase();
-    }).length;
+  const handleDepartmentInput = (event) => {
+    const { name, value } = event.target;
 
-    return {
-      id: department.id,
-      name: department.name,
-      code: department.code,
-      count,
-    };
-  });
+    setDepartmentForm((previous) => ({
+      ...previous,
+      [name]: value,
+    }));
+  };
+
+  const createUser = async (event) => {
+    event.preventDefault();
+
+    if (!userForm.fullName || !userForm.email || !userForm.role) {
+      setMessage("Full name, email, and role are required.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setMessage("Creating user...");
+
+      const res = await api.post("/admin/users", {
+        fullName: userForm.fullName.trim(),
+        email: userForm.email.trim(),
+        password: userForm.password.trim() || undefined,
+        role: userForm.role,
+      });
+
+      const generatedPassword = res.data?.generatedPassword;
+
+      setMessage(
+        generatedPassword
+          ? `${res.data?.message || "User created."} Password: ${generatedPassword}`
+          : res.data?.message || "User created successfully."
+      );
+
+      setUserForm({
+        fullName: "",
+        email: "",
+        password: "",
+        role: "intern",
+      });
+
+      await loadAdminData();
+    } catch (error) {
+      setMessage(error.response?.data?.message || "Failed to create user.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createDepartment = async (event) => {
+    event.preventDefault();
+
+    if (!departmentForm.name || !departmentForm.code) {
+      setMessage("Department name and code are required.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setMessage("Creating department...");
+
+      const res = await api.post("/admin/departments", {
+        name: departmentForm.name.trim(),
+        code: departmentForm.code.trim(),
+      });
+
+      setMessage(res.data?.message || "Department created successfully.");
+
+      setDepartmentForm({
+        name: "",
+        code: "",
+      });
+
+      await loadAdminData();
+    } catch (error) {
+      setMessage(
+        error.response?.data?.message || "Failed to create department."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateUserRole = async (userId, role) => {
+    try {
+      setLoading(true);
+      setMessage("Updating user role...");
+
+      const res = await api.patch(`/admin/users/${userId}/role`, {
+        role,
+      });
+
+      setMessage(res.data?.message || "User role updated.");
+
+      await loadAdminData();
+    } catch (error) {
+      setMessage(error.response?.data?.message || "Failed to update role.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resetPassword = async (userId) => {
+    try {
+      setLoading(true);
+      setMessage("Resetting password...");
+
+      const res = await api.patch(`/admin/users/${userId}/reset-password`);
+
+      setMessage(
+        res.data?.generatedPassword
+          ? `${res.data?.message || "Password reset."} New Password: ${
+              res.data.generatedPassword
+            }`
+          : res.data?.message || "Password reset successfully."
+      );
+
+      await loadAdminData();
+    } catch (error) {
+      setMessage(error.response?.data?.message || "Failed to reset password.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteUser = async (userId) => {
+    const confirmDelete = window.confirm(
+      "Are you sure you want to delete this user?"
+    );
+
+    if (!confirmDelete) return;
+
+    try {
+      setLoading(true);
+      setMessage("Deleting user...");
+
+      const res = await api.delete(`/admin/users/${userId}`);
+
+      setMessage(res.data?.message || "User deleted successfully.");
+
+      await loadAdminData();
+    } catch (error) {
+      setMessage(error.response?.data?.message || "Failed to delete user.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteDepartment = async (departmentId) => {
+    const confirmDelete = window.confirm(
+      "Are you sure you want to delete this department?"
+    );
+
+    if (!confirmDelete) return;
+
+    try {
+      setLoading(true);
+      setMessage("Deleting department...");
+
+      const res = await api.delete(`/admin/departments/${departmentId}`);
+
+      setMessage(res.data?.message || "Department deleted successfully.");
+
+      await loadAdminData();
+    } catch (error) {
+      setMessage(
+        error.response?.data?.message || "Failed to delete department."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <main className="admin-pro-page">
-      <section className="admin-pro-hero">
+    <main className="admin-old-page">
+      <section className="admin-old-hero">
         <div>
-          <p className="admin-pro-kicker">Admin Control Center</p>
+          <p>Admin Control Panel</p>
           <h1>Admin Dashboard</h1>
           <span>
-            Manage users, departments, reports, certificates, work logs,
-            attendance, and audit activity in one clean dashboard.
+            Add users manually, create departments, manage roles, monitor
+            reports, and control the WorkSync system.
           </span>
         </div>
 
-        <button
-          type="button"
-          className="admin-refresh-btn"
-          onClick={loadAdminData}
-          disabled={loading}
-        >
+        <button type="button" onClick={loadAdminData} disabled={loading}>
           {loading ? "Refreshing..." : "Refresh"}
         </button>
       </section>
 
-      {message && <div className="admin-message">{message}</div>}
+      {message && <div className="admin-old-message">{message}</div>}
 
-      <section className="admin-pro-stats">
-        <StatCard
-          label="Total Users"
-          value={summary?.totalUsers ?? users.length}
-          note="All users"
-        />
-        <StatCard label="Admins" value={summary?.totalAdmins ?? roleCounts.admin} note="System access" />
-        <StatCard label="HR" value={summary?.totalHRs ?? roleCounts.hr} note="Onboarding team" />
-        <StatCard label="Mentors" value={summary?.totalMentors ?? roleCounts.mentor} note="Intern guides" />
-        <StatCard label="Interns" value={summary?.totalInterns ?? roleCounts.intern} note="Learners" />
-        <StatCard
-          label="Departments"
-          value={summary?.totalDepartments ?? departments.length}
-          note="Training groups"
-        />
-      </section>
+      <section className="admin-old-tabs">
+        <button
+          type="button"
+          className={activeTab === "overview" ? "active" : ""}
+          onClick={() => setActiveTab("overview")}
+        >
+          Overview
+        </button>
 
-      <section className="admin-tabs">
-        {[
-          ["overview", "Overview"],
-          ["users", "Users"],
-          ["departments", "Departments"],
-          ["reports", "Reports"],
-          ["audit", "Audit Logs"],
-        ].map(([key, label]) => (
-          <button
-            type="button"
-            key={key}
-            className={activeTab === key ? "active" : ""}
-            onClick={() => setActiveTab(key)}
-          >
-            {label}
-          </button>
-        ))}
+        <button
+          type="button"
+          className={activeTab === "users" ? "active" : ""}
+          onClick={() => setActiveTab("users")}
+        >
+          Users
+        </button>
+
+        <button
+          type="button"
+          className={activeTab === "departments" ? "active" : ""}
+          onClick={() => setActiveTab("departments")}
+        >
+          Departments
+        </button>
+
+        <button
+          type="button"
+          className={activeTab === "reports" ? "active" : ""}
+          onClick={() => setActiveTab("reports")}
+        >
+          Reports
+        </button>
       </section>
 
       {activeTab === "overview" && (
-        <section className="admin-pro-grid">
-          <div className="admin-panel large">
-            <PanelHeader
-              title="Role Distribution"
-              subtitle="Users separated by platform roles"
+        <>
+          <section className="admin-old-stats">
+            <AdminStat title="Total Users" value={summary?.totalUsers ?? users.length} />
+            <AdminStat title="Admins" value={summary?.totalAdmins ?? roleCounts.admin} />
+            <AdminStat title="HR" value={summary?.totalHRs ?? roleCounts.hr} />
+            <AdminStat title="Mentors" value={summary?.totalMentors ?? roleCounts.mentor} />
+            <AdminStat title="Interns" value={summary?.totalInterns ?? roleCounts.intern} />
+            <AdminStat
+              title="Departments"
+              value={summary?.totalDepartments ?? departments.length}
+            />
+          </section>
+
+          <section className="admin-old-grid">
+            <CreateUserForm
+              userForm={userForm}
+              handleUserInput={handleUserInput}
+              createUser={createUser}
+              loading={loading}
             />
 
-            <div className="role-list">
-              <RoleRow label="Admin" count={roleCounts.admin} />
-              <RoleRow label="HR" count={roleCounts.hr} />
-              <RoleRow label="Mentor" count={roleCounts.mentor} />
-              <RoleRow label="Intern" count={roleCounts.intern} />
-            </div>
-          </div>
-
-          <div className="admin-panel">
-            <PanelHeader
-              title="Certificate Rule"
-              subtitle="Current eligibility rule"
+            <CreateDepartmentForm
+              departmentForm={departmentForm}
+              handleDepartmentInput={handleDepartmentInput}
+              createDepartment={createDepartment}
+              loading={loading}
             />
+          </section>
 
-            <div className="rule-box">
-              {summary?.certificateRule ||
-                "75% theory/video training completion"}
+          <section className="admin-old-card">
+            <div className="admin-old-card-header">
+              <div>
+                <h2>Recent Users</h2>
+                <p>Latest manually created and registered users.</p>
+              </div>
             </div>
-          </div>
 
-          <div className="admin-panel full">
-            <PanelHeader
-              title="Recent Users"
-              subtitle="Latest user accounts"
+            <UserTable
+              users={users.slice(0, 8)}
+              updateUserRole={updateUserRole}
+              resetPassword={resetPassword}
+              deleteUser={deleteUser}
             />
-
-            <div className="admin-table-wrap">
-              <table className="admin-pro-table">
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th>Email</th>
-                    <th>Role</th>
-                    <th>Created</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {users.slice(0, 8).map((user) => (
-                    <tr key={user.id}>
-                      <td>{user.full_name || user.fullName || "-"}</td>
-                      <td>{user.email || "-"}</td>
-                      <td>
-                        <span className="role-pill">{user.role || "-"}</span>
-                      </td>
-                      <td>{formatDate(user.created_at || user.createdAt)}</td>
-                    </tr>
-                  ))}
-
-                  {users.length === 0 && (
-                    <tr>
-                      <td colSpan="4">No users found.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </section>
+          </section>
+        </>
       )}
 
       {activeTab === "users" && (
-        <section className="admin-panel full">
-          <PanelHeader
-            title="Users"
-            subtitle="All registered users in the system"
+        <section className="admin-old-card">
+          <div className="admin-old-card-header">
+            <div>
+              <h2>Manual User Management</h2>
+              <p>Add users with name, email, password, and role.</p>
+            </div>
+          </div>
+
+          <CreateUserForm
+            userForm={userForm}
+            handleUserInput={handleUserInput}
+            createUser={createUser}
+            loading={loading}
           />
 
-          <div className="admin-table-wrap">
-            <table className="admin-pro-table">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Full Name</th>
-                  <th>Email</th>
-                  <th>Role</th>
-                  <th>Created</th>
-                </tr>
-              </thead>
-              <tbody>
-                {users.map((user) => (
-                  <tr key={user.id}>
-                    <td>{user.id}</td>
-                    <td>{user.full_name || user.fullName || "-"}</td>
-                    <td>{user.email || "-"}</td>
-                    <td>
-                      <span className="role-pill">{user.role || "-"}</span>
-                    </td>
-                    <td>{formatDate(user.created_at || user.createdAt)}</td>
-                  </tr>
-                ))}
+          <div className="admin-old-divider" />
 
-                {users.length === 0 && (
-                  <tr>
-                    <td colSpan="5">No users found.</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          <UserTable
+            users={users}
+            updateUserRole={updateUserRole}
+            resetPassword={resetPassword}
+            deleteUser={deleteUser}
+          />
         </section>
       )}
 
       {activeTab === "departments" && (
-        <section className="admin-panel full">
-          <PanelHeader
-            title="Departments"
-            subtitle="Department-wise intern and training structure"
+        <section className="admin-old-card">
+          <div className="admin-old-card-header">
+            <div>
+              <h2>Department Management</h2>
+              <p>Add departments manually using department name and code.</p>
+            </div>
+          </div>
+
+          <CreateDepartmentForm
+            departmentForm={departmentForm}
+            handleDepartmentInput={handleDepartmentInput}
+            createDepartment={createDepartment}
+            loading={loading}
           />
 
-          <div className="department-grid">
-            {departmentStats.map((department) => (
-              <div className="department-card" key={department.id}>
+          <div className="admin-old-divider" />
+
+          <div className="admin-department-grid">
+            {departments.map((department) => (
+              <div className="admin-department-card" key={department.id}>
                 <div>
                   <h3>{department.name}</h3>
-                  <p>{department.code || "NO CODE"}</p>
+                  <p>Code: {department.code}</p>
+                  <span>Created: {formatDate(department.created_at)}</span>
                 </div>
-                <strong>{department.count}</strong>
+
+                <button
+                  type="button"
+                  onClick={() => deleteDepartment(department.id)}
+                >
+                  Delete
+                </button>
               </div>
             ))}
 
-            {departmentStats.length === 0 && (
-              <div className="empty-state">No departments found.</div>
+            {departments.length === 0 && (
+              <div className="admin-empty">No departments found.</div>
             )}
           </div>
         </section>
       )}
 
       {activeTab === "reports" && (
-        <section className="admin-panel full">
-          <PanelHeader
-            title="Reports & Analytics"
-            subtitle="System overview from recruitment, onboarding, training, attendance, work logs, certificates, and performance"
-          />
-
-          <div className="report-card-grid">
-            {reportCards.map((item) => (
-              <div className="report-pro-card" key={item.title}>
-                <p>{item.title}</p>
-                <h3>{item.value}</h3>
-                <span>{item.description}</span>
-              </div>
-            ))}
+        <section className="admin-old-card">
+          <div className="admin-old-card-header">
+            <div>
+              <h2>Reports & Analytics</h2>
+              <p>
+                Overview of users, departments, applicants, certificates,
+                attendance, and work logs.
+              </p>
+            </div>
           </div>
 
-          <div className="admin-report-section">
-            <h3>Training Completion</h3>
+          <section className="admin-old-stats compact">
+            <AdminStat
+              title="Applicants"
+              value={summary?.totalApplicants ?? 0}
+            />
+            <AdminStat
+              title="Selected Applicants"
+              value={summary?.selectedApplicants ?? 0}
+            />
+            <AdminStat
+              title="Certificates"
+              value={summary?.certificatesIssued ?? 0}
+            />
+            <AdminStat
+              title="Departments"
+              value={summary?.totalDepartments ?? departments.length}
+            />
+          </section>
+
+          <div className="admin-report-box">
+            <h3>Certificate Rule</h3>
             <p>
-              Overall completion of assigned training modules across interns.
+              {summary?.certificateRule ||
+                "75% theory/video training completion"}
             </p>
-
-            <div className="progress-line">
-              <div
-                style={{
-                  width: `${Number(reports?.summary?.trainingCompletion || 0)}%`,
-                }}
-              />
-            </div>
-
-            <strong>{Number(reports?.summary?.trainingCompletion || 0)}%</strong>
           </div>
 
-          <div className="admin-report-section">
-            <h3>Department-wise Intern Count</h3>
-
-            <div className="department-report-list">
-              {departmentStats.map((department) => (
-                <div key={department.id}>
-                  <span>{department.name}</span>
-                  <strong>{department.count}</strong>
-                </div>
-              ))}
-
-              {departmentStats.length === 0 && <p>No department data.</p>}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {activeTab === "audit" && (
-        <section className="admin-panel full">
-          <PanelHeader
-            title="Audit Logs"
-            subtitle="Important system actions such as onboarding, certificates, attendance, training, and admin changes"
-          />
-
-          <div className="audit-summary-grid">
-            <div>
-              <p>Total Loaded Logs</p>
-              <h3>{auditLogs.length}</h3>
-            </div>
-            <div>
-              <p>Today's Logs</p>
-              <h3>{countTodayLogs(auditLogs)}</h3>
-            </div>
-            <div>
-              <p>Action Types</p>
-              <h3>{new Set(auditLogs.map((item) => item.action)).size}</h3>
-            </div>
-          </div>
-
-          <div className="audit-log-list">
-            {auditLogs.slice(0, 20).map((log, index) => (
-              <div className="audit-log-item" key={log.id || index}>
-                <div>
-                  <h4>{log.action || log.event || "System Action"}</h4>
-                  <p>{log.description || log.message || "No description"}</p>
-                </div>
-                <span>{formatDate(log.created_at || log.createdAt)}</span>
-              </div>
-            ))}
-
-            {auditLogs.length === 0 && (
-              <div className="empty-state">
-                No audit logs returned from backend.
-              </div>
-            )}
+          <div className="admin-report-box">
+            <h3>Raw Report Data</h3>
+            <pre>{reports ? JSON.stringify(reports, null, 2) : "No report data found."}</pre>
           </div>
         </section>
       )}
@@ -421,32 +489,204 @@ function AdminDashboard() {
   );
 }
 
-function StatCard({ label, value, note }) {
+function CreateUserForm({ userForm, handleUserInput, createUser, loading }) {
   return (
-    <div className="admin-stat-card">
-      <p>{label}</p>
-      <h2>{value}</h2>
-      <span>{note}</span>
-    </div>
-  );
-}
-
-function PanelHeader({ title, subtitle }) {
-  return (
-    <div className="panel-header">
-      <div>
-        <h2>{title}</h2>
-        <p>{subtitle}</p>
+    <form className="admin-old-card form-card" onSubmit={createUser}>
+      <div className="admin-old-card-header">
+        <div>
+          <h2>Add User Manually</h2>
+          <p>Create Admin, HR, Mentor, or Intern account.</p>
+        </div>
       </div>
+
+      <div className="admin-form-grid">
+        <div className="admin-form-group">
+          <label>Full Name *</label>
+          <input
+            type="text"
+            name="fullName"
+            value={userForm.fullName}
+            onChange={handleUserInput}
+            placeholder="Enter full name"
+          />
+        </div>
+
+        <div className="admin-form-group">
+          <label>Email *</label>
+          <input
+            type="email"
+            name="email"
+            value={userForm.email}
+            onChange={handleUserInput}
+            placeholder="Enter email"
+          />
+        </div>
+
+        <div className="admin-form-group">
+          <label>Password</label>
+          <input
+            type="text"
+            name="password"
+            value={userForm.password}
+            onChange={handleUserInput}
+            placeholder="Enter password or leave empty"
+          />
+        </div>
+
+        <div className="admin-form-group">
+          <label>Role *</label>
+          <select name="role" value={userForm.role} onChange={handleUserInput}>
+            <option value="admin">Admin</option>
+            <option value="hr">HR</option>
+            <option value="mentor">Mentor</option>
+            <option value="intern">Intern</option>
+          </select>
+        </div>
+      </div>
+
+      <button className="admin-main-btn" type="submit" disabled={loading}>
+        {loading ? "Saving..." : "Add User"}
+      </button>
+    </form>
+  );
+}
+
+function CreateDepartmentForm({
+  departmentForm,
+  handleDepartmentInput,
+  createDepartment,
+  loading,
+}) {
+  return (
+    <form className="admin-old-card form-card" onSubmit={createDepartment}>
+      <div className="admin-old-card-header">
+        <div>
+          <h2>Add Department</h2>
+          <p>Create departments manually for onboarding and training.</p>
+        </div>
+      </div>
+
+      <div className="admin-form-grid">
+        <div className="admin-form-group">
+          <label>Department Name *</label>
+          <input
+            type="text"
+            name="name"
+            value={departmentForm.name}
+            onChange={handleDepartmentInput}
+            placeholder="Example: IT"
+          />
+        </div>
+
+        <div className="admin-form-group">
+          <label>Department Code *</label>
+          <input
+            type="text"
+            name="code"
+            value={departmentForm.code}
+            onChange={handleDepartmentInput}
+            placeholder="Example: IT"
+          />
+        </div>
+      </div>
+
+      <button className="admin-main-btn" type="submit" disabled={loading}>
+        {loading ? "Saving..." : "Add Department"}
+      </button>
+    </form>
+  );
+}
+
+function UserTable({ users, updateUserRole, resetPassword, deleteUser }) {
+  if (!users || users.length === 0) {
+    return <div className="admin-empty">No users found.</div>;
+  }
+
+  return (
+    <div className="admin-table-wrap">
+      <table className="admin-old-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Current Role</th>
+            <th>Change Role</th>
+            <th>Created</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {users.map((user) => (
+            <UserTableRow
+              key={user.id}
+              user={user}
+              updateUserRole={updateUserRole}
+              resetPassword={resetPassword}
+              deleteUser={deleteUser}
+            />
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
 
-function RoleRow({ label, count }) {
+function UserTableRow({ user, updateUserRole, resetPassword, deleteUser }) {
+  const [selectedRole, setSelectedRole] = useState(user.role || "intern");
+
   return (
-    <div className="role-row">
-      <span>{label}</span>
-      <strong>{count}</strong>
+    <tr>
+      <td>{user.full_name || user.fullName || "-"}</td>
+      <td>{user.email || "-"}</td>
+      <td>
+        <span className="admin-role-pill">{user.role || "-"}</span>
+      </td>
+      <td>
+        <select
+          className="table-select"
+          value={selectedRole}
+          onChange={(event) => setSelectedRole(event.target.value)}
+        >
+          <option value="admin">Admin</option>
+          <option value="hr">HR</option>
+          <option value="mentor">Mentor</option>
+          <option value="intern">Intern</option>
+        </select>
+
+        <button
+          type="button"
+          className="table-btn"
+          onClick={() => updateUserRole(user.id, selectedRole)}
+        >
+          Update
+        </button>
+      </td>
+      <td>{formatDate(user.created_at || user.createdAt)}</td>
+      <td>
+        <div className="table-actions">
+          <button type="button" onClick={() => resetPassword(user.id)}>
+            Reset
+          </button>
+
+          <button
+            type="button"
+            className="danger"
+            onClick={() => deleteUser(user.id)}
+          >
+            Delete
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+function AdminStat({ title, value }) {
+  return (
+    <div className="admin-old-stat">
+      <p>{title}</p>
+      <h2>{value}</h2>
     </div>
   );
 }
@@ -459,15 +699,6 @@ function formatDate(value) {
   } catch (error) {
     return String(value).slice(0, 10);
   }
-}
-
-function countTodayLogs(logs) {
-  const today = new Date().toISOString().slice(0, 10);
-
-  return logs.filter((item) => {
-    const value = item.created_at || item.createdAt;
-    return value && String(value).slice(0, 10) === today;
-  }).length;
 }
 
 export default AdminDashboard;
