@@ -11,6 +11,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import HomePage from "./pages/HomePage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
+import ApplicantForm from "./pages/ApplicantForm";
 
 import AdminDashboard from "./pages/AdminDashboard";
 import HRDashboard from "./pages/HRDashboard";
@@ -153,6 +154,7 @@ function App() {
   const publicPages = [
     "/login",
     "/register",
+    "/apply",
     "/session-expired",
     "/unauthorized",
   ];
@@ -165,6 +167,8 @@ function App() {
 
       <Routes>
         <Route path="/" element={<HomePage />} />
+
+        <Route path="/apply" element={<ApplicantForm />} />
 
         <Route
           path="/login"
@@ -187,8 +191,6 @@ function App() {
             )
           }
         />
-
-        <Route path="/apply" element={<Navigate to="/register" replace />} />
 
         <Route
           path="/dashboard"
